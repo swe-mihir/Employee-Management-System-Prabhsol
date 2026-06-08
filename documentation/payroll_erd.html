@@ -1,0 +1,118 @@
+
+<style>
+#erd svg { width: 100%; }
+</style>
+<div id="erd" style="padding: 1rem 0"></div>
+<script type="module">
+import mermaid from 'https://esm.sh/mermaid@11/dist/mermaid.esm.min.mjs';
+const dark = matchMedia('(prefers-color-scheme: light)').matches;
+await document.fonts.ready;
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'base',
+  fontFamily: '"Anthropic Sans", sans-serif',
+  themeVariables: {
+    darkMode: dark,
+    fontSize: '13px',
+    fontFamily: '"Anthropic Sans", sans-serif',
+    lineColor: dark ? '#9c9a92' : '#73726c',
+    textColor: dark ? '#c2c0b6' : '#3d3d3a',
+  },
+});
+const diagram = `erDiagram
+  employees ||--o{ attendance : "has"
+  employees ||--o{ employee_salary_structure : "has"
+  employees ||--o{ salary_history : "has"
+  salary_history ||--o{ salary_components : "breaks down into"
+
+  employees {
+    uuid id PK
+    string name
+    date date_of_birth
+    string department
+    string designation
+    date join_date
+    date leaving_date
+    boolean is_active
+    varchar(12) aadhar_no
+    varchar(10) pan_no
+    varchar(12) pf_no
+    varchar(12) ip_no
+  }
+
+  attendance {
+    uuid id PK
+    uuid employee_id FK
+    date date
+    string status
+    time clock_in
+    time clock_out
+    float hours_worked
+  }
+
+  employee_salary_structure {
+    uuid id PK
+    uuid employee_id FK
+    float base_salary
+    float hra
+    float transport_allowance
+    float other_allowances
+    string pay_cycle
+    date effective_from
+    date effective_to
+  }
+
+  salary_history {
+    uuid id PK
+    uuid employee_id FK
+    int month
+    int year
+    int days_present
+    int days_absent
+    int leaves_taken
+    float gross_salary
+    float total_deductions
+    float net_salary
+    float total_ctc
+    string status
+    timestamp calculated_at
+    timestamp paid_at
+  }
+
+  salary_components {
+    uuid id PK
+    uuid salary_history_id FK
+    string component_name
+    string component_type
+    float amount
+    string note
+  }
+`;
+
+const { svg } = await mermaid.render('erd-svg', diagram);
+document.getElementById('erd').innerHTML = svg;
+
+document.querySelectorAll('#erd svg .node').forEach(node => {
+  const firstPath = node.querySelector('path[d]');
+  if (!firstPath) return;
+  const d = firstPath.getAttribute('d');
+  const nums = d.match(/-?[\d.]+/g)?.map(Number);
+  if (!nums || nums.length < 8) return;
+  const xs = [nums[0], nums[2], nums[4], nums[6]];
+  const ys = [nums[1], nums[3], nums[5], nums[7]];
+  const x = Math.min(...xs), y = Math.min(...ys);
+  const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+  const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+  rect.setAttribute('x', x); rect.setAttribute('y', y);
+  rect.setAttribute('width', w); rect.setAttribute('height', h);
+  rect.setAttribute('rx', '8');
+  for (const a of ['fill', 'stroke', 'stroke-width', 'class', 'style']) {
+    if (firstPath.hasAttribute(a)) rect.setAttribute(a, firstPath.getAttribute(a));
+  }
+  firstPath.replaceWith(rect);
+});
+
+document.querySelectorAll('#erd svg .row-rect-odd path, #erd svg .row-rect-even path').forEach(p => {
+  p.setAttribute('stroke', 'none');
+});
+</script>
