@@ -87,6 +87,7 @@ The `component_type` column classifies each row into one of four categories:
 - **earning** — actual earned amounts calculated from attendance
 - **deduction** — amounts deducted from the employee's gross
 - **employer_contribution** — statutory contributions borne by the employer (not deducted from employee)
+
 | Column | Type | Description |
 |---|---|---|
 | `id` | UUID | Primary key |
