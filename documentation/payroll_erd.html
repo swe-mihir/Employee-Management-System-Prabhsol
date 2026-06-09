@@ -23,8 +23,12 @@ const diagram = `erDiagram
   employees ||--o{ attendance : "has"
   employees ||--o{ employee_salary_structure : "has"
   employees ||--o{ salary_history : "has"
+  employees ||--o{ users : "has account"
   salary_history ||--o{ salary_components : "breaks down into"
-
+  users ||--o{ user_roles : "assigned"
+  roles ||--o{ user_roles : "given to"
+  roles ||--o{ role_permissions : "grants"
+  permissions ||--o{ role_permissions : "granted via"
   employees {
     uuid id PK
     string name
@@ -34,6 +38,10 @@ const diagram = `erDiagram
     date join_date
     date leaving_date
     boolean is_active
+    string personal_phone
+    string work_phone
+    string personal_email
+    string work_email
     varchar(12) aadhar_no
     varchar(10) pan_no
     varchar(12) pf_no
@@ -86,6 +94,33 @@ const diagram = `erDiagram
     string component_type
     float amount
     string note
+  }
+
+  users {
+    int id PK
+    int employee_id FK
+    string email
+    string password_hash
+    bool is_active
+    timestamp created_at
+  }
+  roles {
+    int id PK
+    string role_name
+  }
+  permissions {
+    int id PK
+    string permission_name
+    string description
+  }
+  user_roles {
+    int user_id FK
+    int role_id FK
+    timestamp assigned_at
+  }
+  role_permissions {
+    int role_id FK
+    int permission_id FK
   }
 `;
 
