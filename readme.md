@@ -15,6 +15,10 @@ Core employee master data. Every other table links back to this.
 | `join_date` | DATE | Date the employee joined the organisation |
 | `leaving_date` | DATE | Date the employee left the organisation |
 | `is_active` | BOOLEAN | Whether the employee is currently active |
+| `personal_phone` | STRING | Employee's personal mobile number |
+| `work_phone` | STRING | Employee's work or office phone number |
+| `personal_email` | STRING | Employee's personal email address |
+| `work_email` | STRING | Employee's official work email address |
 | `aadhar_no` | VARCHAR(12) | Aadhar card number of the employee |
 | `pan_no` | VARCHAR(10) | PAN card number of the employee |
 | `pf_no` | VARCHAR(12) | UAN of PF of the employee |
