@@ -2,3 +2,16 @@ documentation/*.xlsx
 documentation/*.xlsm
 documentation/*.txt
 backend/*.env
+
+venv/
+.env
+
+__pycache__/
+*.py[cod]
+
+.pytest_cache/
+.mypy_cache/
+
+.vscode/
+
+*.log
