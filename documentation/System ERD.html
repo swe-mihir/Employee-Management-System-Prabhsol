@@ -29,6 +29,9 @@ const diagram = `erDiagram
   roles ||--o{ user_roles : "given to"
   roles ||--o{ role_permissions : "grants"
   permissions ||--o{ role_permissions : "granted via"
+  users ||--o{ activity_log : "performed"
+  users ||--o{ deletion_audit_log : "authorized"
+
   employees {
     uuid id PK
     string name
@@ -121,6 +124,28 @@ const diagram = `erDiagram
   role_permissions {
     int role_id FK
     int permission_id FK
+  }
+
+  activity_log {
+    bigserial id PK
+    timestamptz occurred_at
+    int performed_by FK
+    varchar operation
+    varchar table_name
+    text record_id
+    jsonb old_data
+    jsonb new_data
+    text[] changed_fields
+  }
+
+  deletion_audit_log {
+    bigserial id PK
+    timestamptz deleted_at
+    int deleted_by FK
+    varchar table_name
+    text record_id
+    text reason
+    jsonb snapshot
   }
 `;
 
