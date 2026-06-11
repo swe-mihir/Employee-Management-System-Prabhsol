@@ -10,11 +10,14 @@
   },
   "dependencies": {
     "axios": "^1.17.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "jwt-decode": "^4.0.0",
     "next": "16.2.9",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "react-hook-form": "^7.78.0"
+    "react-hook-form": "^7.78.0",
+    "xlsx": "^0.18.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

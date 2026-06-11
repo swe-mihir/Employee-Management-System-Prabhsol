@@ -26,9 +26,9 @@ export default function LoginPage() {
               <path d="M10 28L20 12L30 28H10Z" fill="white" />
             </svg>
           </div>
-          <h1 className={styles.brandName}>AcmeCorp EMS</h1>
+          <h1 className={styles.brandName}>Prabhsol</h1>
           <p className={styles.brandTagline}>
-            Your people, processes, and payroll — all in one place.
+            Delivering Solutions
           </p>
         </div>
       </div>

@@ -11,7 +11,7 @@ from fastapi.security import HTTPBearer
 
 from fastapi.middleware.cors import CORSMiddleware
 
-
+from app.employees.router import router as employees_router
 
 security = HTTPBearer()
 
@@ -41,6 +41,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(employees_router)
 
 def custom_openapi():
     if app.openapi_schema:
