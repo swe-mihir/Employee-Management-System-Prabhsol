@@ -1,10 +1,15 @@
 from contextlib import asynccontextmanager
 import logging
 from fastapi import FastAPI, Request
+from fastapi.openapi.utils import get_openapi
 from sqlalchemy import text
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.db.session import engine
+from app.auth.router import router as auth_router
+from fastapi.security import HTTPBearer
+
+security = HTTPBearer()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -22,6 +27,27 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
 
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title="EMS API",
+        version="1.0.0",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "bearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "bearerFormat": "JWT",
+        }
+    }
+    openapi_schema["security"] = [{"bearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
+
 @app.middleware("http")
 async def log_requests(request: Request, call_next):
     logger.info(f"--> {request.method} {request.url.path}")
@@ -32,3 +58,5 @@ async def log_requests(request: Request, call_next):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "app": settings.APP_NAME}
+
+app.include_router(auth_router)
