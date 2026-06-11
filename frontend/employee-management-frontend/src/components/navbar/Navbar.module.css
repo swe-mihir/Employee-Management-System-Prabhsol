@@ -1,0 +1,49 @@
+.navbar {
+  height: var(--navbar-height); background: var(--bg-card);
+  border-bottom: 1px solid var(--border-default);
+  padding: 0 28px;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-shrink: 0; position: sticky; top: 0; z-index: 10;
+}
+.left { display: flex; align-items: baseline; gap: 12px; min-width: 0; }
+.pageTitle { font-size: 17px; font-weight: 700; color: var(--text-primary); white-space: nowrap; }
+.pageDesc { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+.searchBox {
+  display: flex; align-items: center; gap: 8px;
+  height: 34px; padding: 0 12px;
+  background: var(--bg-base); border: 1px solid var(--border-default); border-radius: 20px;
+  transition: border-color 0.15s;
+}
+.searchBox:focus-within { border-color: var(--brand-blue); }
+.searchIcon { color: var(--text-muted); flex-shrink: 0; }
+.searchInput {
+  border: none; background: transparent; outline: none;
+  font-size: 13px; font-family: inherit; color: var(--text-primary); width: 160px;
+}
+.searchInput::placeholder { color: var(--text-muted); }
+
+.iconBtn {
+  width: 36px; height: 36px; background: transparent;
+  border: 1px solid var(--border-default); border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-secondary); position: relative; transition: background 0.15s;
+}
+.iconBtn:hover { background: var(--bg-base); }
+.badge {
+  position: absolute; top: 4px; right: 4px;
+  width: 16px; height: 16px; background: var(--brand-orange); color: #fff;
+  font-size: 9px; font-weight: 700; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; line-height: 1;
+}
+
+.avatarBtn { display: flex; align-items: center; cursor: pointer; margin-left: 4px; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--brand-blue); color: #fff;
+  font-size: 11px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid var(--border-default); transition: border-color 0.15s;
+}
+.avatarBtn:hover .avatar { border-color: var(--brand-orange); }

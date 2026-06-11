@@ -1,0 +1,25 @@
+.root { display: flex; flex-direction: column; gap: 20px; }
+.pageHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.headerLeft { display: flex; flex-direction: column; gap: 4px; }
+.heading { font-size: 20px; font-weight: 700; color: var(--text-primary); }
+.subheading { font-size: 13px; color: var(--text-secondary); }
+.primaryBtn {
+  height: 38px; padding: 0 18px; background: var(--brand-orange); color: #fff;
+  border: none; border-radius: var(--radius-md);
+  font-size: 13.5px; font-weight: 600; transition: background 0.15s; white-space: nowrap; flex-shrink: 0;
+}
+.primaryBtn:hover { background: var(--brand-orange-hover); }
+
+.emptyState {
+  background: var(--bg-card); border: 1.5px dashed var(--border-strong);
+  border-radius: var(--radius-lg); padding: 64px 32px;
+  display: flex; flex-direction: column; align-items: center; gap: 10px; text-align: center;
+}
+.emptyIcon {
+  width: 56px; height: 56px; background: var(--brand-blue-light);
+  border-radius: var(--radius-lg);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--brand-blue); margin-bottom: 4px;
+}
+.emptyTitle { font-size: 15px; font-weight: 700; color: var(--text-primary); }
+.emptyBody { font-size: 13px; color: var(--text-secondary); max-width: 320px; line-height: 1.5; }

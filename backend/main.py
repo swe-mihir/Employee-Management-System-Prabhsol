@@ -9,6 +9,10 @@ from app.db.session import engine
 from app.auth.router import router as auth_router
 from fastapi.security import HTTPBearer
 
+from fastapi.middleware.cors import CORSMiddleware
+
+
+
 security = HTTPBearer()
 
 @asynccontextmanager
@@ -26,6 +30,17 @@ async def lifespan(app: FastAPI):
     logger.info(f"{settings.APP_NAME} shutting down...")
 
 app = FastAPI(title=settings.APP_NAME, debug=settings.DEBUG, lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://192.168.56.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def custom_openapi():
     if app.openapi_schema:
