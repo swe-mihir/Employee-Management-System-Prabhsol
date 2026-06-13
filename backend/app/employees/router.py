@@ -11,7 +11,7 @@ router = APIRouter(prefix="/employees", tags=["Employees"])
 
 @router.get("", response_model=EmployeeListResponse)
 def list_employees(
-    status: str = Query("current", pattern="^(current|left|all)$"),
+    status: str = Query("current", pattern="^(current|left|all|pending)$"),
     sort_by: str = Query("name"),
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
@@ -50,5 +50,15 @@ def update_employee(
 ):
     try:
         return employee_service.update_employee(db, employee_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    
+@router.post("/{employee_id}/approve", response_model=EmployeeResponse)
+def approve_employee(
+    employee_id: str,
+    db: Session = Depends(get_audited_session),
+):
+    try:
+        return employee_service.approve_employee(db, employee_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))

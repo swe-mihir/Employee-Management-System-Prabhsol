@@ -6,6 +6,7 @@ import {
   fetchEmployees,
   createEmployee,
   updateEmployee,
+  approveEmployee,   
   Employee,
   EmployeeCreate,
 } from "@/services/api/employees";
@@ -20,7 +21,8 @@ type ColKey =
   | "sr" | "name" | "designation" | "department"
   | "join_date" | "leaving_date" | "date_of_birth"
   | "personal_phone" | "work_phone" | "personal_email" | "work_email"
-  | "aadhar_no" | "pan_no" | "pf_no" | "ip_no" | "is_active";
+  | "aadhar_no" | "pan_no" | "pf_no" | "ip_no" | "is_active"
+  | "approve_before";
 
 const ALL_COLUMNS: { key: ColKey; label: string; sortable?: boolean }[] = [
   { key: "sr",             label: "Sr. No." },
@@ -39,6 +41,7 @@ const ALL_COLUMNS: { key: ColKey; label: string; sortable?: boolean }[] = [
   { key: "pf_no",          label: "PF No" },
   { key: "ip_no",          label: "IP No" },
   { key: "is_active",      label: "Status" },
+  { key: "approve_before", label: "Approve Before" }, 
 ];
 
 const DEFAULT_COLS: ColKey[] = ["sr", "name", "designation", "department", "join_date"];
@@ -61,6 +64,8 @@ type EditForm = {
   pan_no: string;
   pf_no: string;
   ip_no: string;
+  status: string;
+  approve_before: string;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -73,6 +78,7 @@ function getCellValue(emp: Employee, key: ColKey, index: number, page: number, p
   if (key === "sr") return String((page - 1) * pageSize + index + 1);
   if (key === "is_active") return emp.is_active ? "Active" : "Left";
   const val = emp[key as keyof Employee];
+  if (key === "approve_before") return emp.approve_before ?? "—";
   if (val === null || val === undefined) return "—";
   return String(val);
 }
@@ -94,6 +100,8 @@ function empToEditForm(emp: Employee): EditForm {
     pan_no:         emp.pan_no ?? "",
     pf_no:          emp.pf_no ?? "",
     ip_no:          emp.ip_no ?? "",
+    status:         emp.status ?? "active",
+    approve_before: emp.approve_before ?? "",
   };
 }
 
@@ -101,7 +109,7 @@ const EMPTY_CREATE: EmployeeCreate = {
   name: "", join_date: "", date_of_birth: "", department: "",
   designation: "", personal_phone: "", work_phone: "",
   personal_email: "", work_email: "", aadhar_no: "", pan_no: "",
-  pf_no: "", ip_no: "",
+  pf_no: "", ip_no: "", status: "active", approve_before: "",
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -112,7 +120,8 @@ export default function EmployeesPage() {
   const [loading, setLoading]         = useState(true);
   const [error, setError]             = useState<string | null>(null);
 
-  const [statusFilter, setStatusFilter] = useState<"current" | "left" | "all">("current");
+  const [statusFilter, setStatusFilter] = useState<"current" | "left" | "pending" | "all">("current");
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [sortBy, setSortBy]           = useState("name");
   const [sortDir, setSortDir]         = useState<"asc" | "desc">("asc");
   const [page, setPage]               = useState(1);
@@ -138,6 +147,12 @@ export default function EmployeesPage() {
   const [editForm, setEditForm]       = useState<EditForm | null>(null);
   const [editSaving, setEditSaving]   = useState(false);
   const [editError, setEditError]     = useState<string | null>(null);
+
+  // Password confirmation for deactivation
+  const [deactivateConfirm, setDeactivateConfirm] = useState(false);
+  const [deactivatePassword, setDeactivatePassword] = useState("");
+  const [deactivateError, setDeactivateError] = useState<string | null>(null);
+  const [deactivateVerifying, setDeactivateVerifying] = useState(false);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
@@ -211,6 +226,53 @@ export default function EmployeesPage() {
     setEditError(null);
   }
 
+  // Called when the status select changes to "left"
+  function handleStatusChangeToLeft() {
+    // Only prompt if the employee is currently active
+    setDeactivatePassword("");
+    setDeactivateError(null);
+    setDeactivateConfirm(true);
+  }
+
+  // Called after password is confirmed — applies the deactivation to the form
+  async function handleDeactivateConfirm() {
+    if (!deactivatePassword.trim()) {
+      setDeactivateError("Please enter your password.");
+      return;
+    }
+    setDeactivateVerifying(true);
+    setDeactivateError(null);
+    try {
+      // Verify password via the login endpoint (re-use existing auth service)
+      const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+      // Extract email from the stored access token's JWT payload (middle segment)
+      const email = (() => {
+        try {
+          const token = localStorage.getItem("ems_access_token") ?? "";
+          const payload = JSON.parse(atob(token.split(".")[1]));
+          return payload.email ?? "";
+        } catch { return ""; }
+      })();
+      const res = await fetch(`${API_BASE}/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: deactivatePassword }),
+      });
+      if (!res.ok) {
+        setDeactivateError("Incorrect password. Please try again.");
+        return;
+      }
+      // Password correct — apply deactivation to the form
+      setEditForm(f => f ? { ...f, is_active: false } : f);
+      setDeactivateConfirm(false);
+      setDeactivatePassword("");
+    } catch {
+      setDeactivateError("Unable to verify password. Please try again.");
+    } finally {
+      setDeactivateVerifying(false);
+    }
+  }
+
   async function handleEdit() {
     if (!editEmp || !editForm) return;
     if (!editForm.name || !editForm.join_date) {
@@ -231,6 +293,18 @@ export default function EmployeesPage() {
       setEditError(e instanceof Error ? e.message : "Failed to update employee");
     } finally {
       setEditSaving(false);
+    }
+  }
+
+ async function handleApprove(emp: Employee) {
+    setApprovingId(emp.id);
+    try {
+      await approveEmployee(emp.id);
+      load();
+    } catch (e: unknown) {
+      console.error("Approve failed:", e);
+    } finally {
+      setApprovingId(null);
     }
   }
 
@@ -345,14 +419,14 @@ export default function EmployeesPage() {
           <div className={styles.left}>
             <h1 className={styles.title}>Employees</h1>
             <div className={styles.radioGroup}>
-              {(["current", "left", "all"] as const).map(opt => (
+              {(["current", "left", "pending", "all"] as const).map(opt => (
                 <label key={opt} className={`${styles.radioLabel} ${statusFilter === opt ? styles.radioActive : ""}`}>
                   <input type="radio" name="status" value={opt}
                     checked={statusFilter === opt}
                     onChange={() => { setStatusFilter(opt); setPage(1); }}
                     className={styles.radioInput}
                   />
-                  {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                  {opt === "pending" ? "Pending" : opt.charAt(0).toUpperCase() + opt.slice(1)}
                 </label>
               ))}
             </div>
@@ -453,14 +527,32 @@ export default function EmployeesPage() {
                           <span className={`${styles.badge} ${emp.is_active ? styles.badgeActive : styles.badgeLeft}`}>
                             {emp.is_active ? "Active" : "Left"}
                           </span>
+                        ) : col.key === "approve_before" ? (
+                          <span>{emp.approve_before ?? "—"}</span>
+                        ) : col.key === "name" && (emp.status === "pending" || emp.status === "flagged") ? (
+                          <>
+                            {getCellValue(emp, col.key, i, page, pageSize)}
+                            <span className={`${styles.badge} ${emp.status === "pending" ? styles.badgePending : styles.badgeFlagged}`} style={{marginLeft: 6}}>
+                              {emp.status === "pending" ? "Pending" : "Flagged"}
+                            </span>
+                          </>
                         ) : getCellValue(emp, col.key, i, page, pageSize)}
                       </td>
                     ))}
                     <td className={styles.td}>
-                      <div className={styles.actions}>
-                        <button className={styles.actionBtnView} onClick={() => setViewEmp(emp)}>View</button>
-                        <button className={styles.actionBtnEdit} onClick={() => openEdit(emp)}>Edit</button>
-                      </div>
+                       <div className={styles.actions}>
+                          {(emp.status === "pending" || emp.status === "flagged") && (
+                            <button
+                              className={styles.actionBtnApprove}
+                              onClick={() => handleApprove(emp)}
+                              disabled={approvingId === emp.id}
+                            >
+                              {approvingId === emp.id ? "…" : "Approve"}
+                            </button>
+                          )}
+                          <button className={styles.actionBtnView} onClick={() => setViewEmp(emp)}>View</button>
+                          <button className={styles.actionBtnEdit} onClick={() => openEdit(emp)}>Edit</button>
+                        </div>
                     </td>
                   </tr>
                 ))
@@ -538,7 +630,21 @@ export default function EmployeesPage() {
                   <Field label="Department"    value={addForm.department ?? ""} onChange={v => setAddForm(f => ({ ...f, department: v }))} />
                   <Field label="Designation"   value={addForm.designation ?? ""} onChange={v => setAddForm(f => ({ ...f, designation: v }))} />
                   <Field label="Join Date *"   type="date" value={addForm.join_date} onChange={v => setAddForm(f => ({ ...f, join_date: v }))} />
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Initial Status</label>
+                  <select className={styles.fieldInput}
+                    value={addForm.status ?? "active"}
+                    onChange={e => setAddForm(f => ({ ...f, status: e.target.value, approve_before: e.target.value !== "pending" ? "" : f.approve_before }))}
+                  >
+                    <option value="active">Active</option>
+                    <option value="pending">Pending Approval</option>
+                  </select>
                 </div>
+                {addForm.status === "pending" && (
+                  <Field label="Approve Before *" type="date" value={addForm.approve_before ?? ""} onChange={v => setAddForm(f => ({ ...f, approve_before: v }))} />
+                )}                
+                </div>
+                
                 <div className={styles.formSection}>
                   <p className={styles.sectionLabel}>Contact</p>
                   <Field label="Personal Phone" value={addForm.personal_phone ?? ""} onChange={v => setAddForm(f => ({ ...f, personal_phone: v }))} />
@@ -585,14 +691,55 @@ export default function EmployeesPage() {
                   <Field label="Join Date *"   type="date" value={editForm.join_date}  onChange={v => setEditForm(f => f && ({ ...f, join_date: v }))} />
                   <Field label="Leaving Date"  type="date" value={editForm.leaving_date} onChange={v => setEditForm(f => f && ({ ...f, leaving_date: v }))} />
                   <div className={styles.field}>
-                    <label className={styles.fieldLabel}>Status</label>
-                    <select className={styles.fieldInput}
-                      value={editForm.is_active ? "active" : "left"}
-                      onChange={e => setEditForm(f => f && ({ ...f, is_active: e.target.value === "active" }))}
-                    >
-                      <option value="active">Active</option>
-                      <option value="left">Left</option>
-                    </select>
+                    <label className={styles.fieldLabel}>
+                      Status
+                      {/* Once inactive, show a lock hint */}
+                      {!editEmp.is_active && (
+                        <span style={{
+                          marginLeft: 8,
+                          fontSize: 11,
+                          fontWeight: 400,
+                          color: "var(--text-muted)",
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 3,
+                        }}>
+                          <svg width="11" height="11" viewBox="0 0 16 16" fill="none" aria-hidden>
+                            <rect x="3" y="7" width="10" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                            <path d="M5 7V5a3 3 0 1 1 6 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                          </svg>
+                          Locked
+                        </span>
+                      )}
+                    </label>
+                    {editEmp.is_active ? (
+                      // Employee is currently active — show a live select that intercepts "left"
+                      <select
+                        className={styles.fieldInput}
+                        value={editForm.is_active ? "active" : "left"}
+                        onChange={e => {
+                          if (e.target.value === "left") {
+                            handleStatusChangeToLeft();
+                          }
+                          // "active" → "active" is a no-op (already active)
+                        }}
+                      >
+                        <option value="active">Active</option>
+                        <option value="left">Left</option>
+                      </select>
+                    ) : (
+                      // Employee is already inactive — field is locked, show read-only badge
+                      <div className={styles.fieldInput} style={{
+                        display: "flex",
+                        alignItems: "center",
+                        background: "var(--bg-base)",
+                        color: "var(--text-muted)",
+                        cursor: "not-allowed",
+                        userSelect: "none",
+                      }}>
+                        <span className={`${styles.badge} ${styles.badgeLeft}`} style={{ fontSize: 12 }}>Left</span>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className={styles.formSection}>
@@ -615,6 +762,66 @@ export default function EmployeesPage() {
               <button className={styles.btnSecondary} onClick={() => setEditEmp(null)}>Cancel</button>
               <button className={styles.btnPrimary} onClick={handleEdit} disabled={editSaving}>
                 {editSaving ? "Saving…" : "Save Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Deactivate Password Confirmation Modal ── */}
+      {deactivateConfirm && (
+        <div className={styles.modalOverlay} style={{ zIndex: 300 }} onClick={() => {
+          setDeactivateConfirm(false);
+          setDeactivatePassword("");
+          setDeactivateError(null);
+        }}>
+          <div className={styles.modal} style={{ maxWidth: 420 }} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Confirm Deactivation</h2>
+              <button className={styles.modalClose} onClick={() => {
+                setDeactivateConfirm(false);
+                setDeactivatePassword("");
+                setDeactivateError(null);
+              }}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: 13.5, color: "var(--text-secondary)", marginBottom: 16, lineHeight: 1.55 }}>
+                Marking an employee as <strong style={{ color: "var(--text-primary)" }}>Left</strong> is permanent and cannot be undone from this interface. Enter your password to confirm.
+              </p>
+              {deactivateError && (
+                <div className={styles.errorBanner} style={{ marginBottom: 14 }}>{deactivateError}</div>
+              )}
+              <div className={styles.field}>
+                <label className={styles.fieldLabel}>Your password</label>
+                <input
+                  type="password"
+                  className={styles.fieldInput}
+                  placeholder="Enter your password"
+                  value={deactivatePassword}
+                  onChange={e => setDeactivatePassword(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter") handleDeactivateConfirm(); }}
+                  autoFocus
+                />
+              </div>
+            </div>
+            <div className={styles.modalFooter}>
+              <button
+                className={styles.btnSecondary}
+                onClick={() => {
+                  setDeactivateConfirm(false);
+                  setDeactivatePassword("");
+                  setDeactivateError(null);
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                className={styles.btnPrimary}
+                style={{ background: "#b91c1c" }}
+                onClick={handleDeactivateConfirm}
+                disabled={deactivateVerifying || !deactivatePassword.trim()}
+              >
+                {deactivateVerifying ? "Verifying…" : "Confirm & Mark as Left"}
               </button>
             </div>
           </div>

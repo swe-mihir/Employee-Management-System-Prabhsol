@@ -8,6 +8,8 @@ from app.core.logging import setup_logging, logger
 from app.db.session import engine
 from app.auth.router import router as auth_router
 from fastapi.security import HTTPBearer
+import asyncio
+from datetime import date, datetime, timedelta
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -76,3 +78,36 @@ def health_check():
     return {"status": "ok", "app": settings.APP_NAME}
 
 app.include_router(auth_router)
+
+async def daily_flag_job():
+    while True:
+        # Sleep until next midnight
+        now = datetime.now()
+        tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+        await asyncio.sleep((tomorrow - now).total_seconds())
+        
+        from app.db.session import SessionLocal
+        from app.employees.service import flag_overdue_employees
+        db = SessionLocal()
+        try:
+            count = flag_overdue_employees(db)
+            logger.info(f"Flagged {count} overdue pending employees")
+        except Exception as e:
+            logger.error(f"daily_flag_job error: {e}")
+        finally:
+            db.close()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    setup_logging()
+    logger.info(f"{settings.APP_NAME} starting up...")
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        logger.info("Database connection successful")
+    except Exception as e:
+        logger.error(f"Database connection failed: {e}")
+        raise
+    asyncio.create_task(daily_flag_job())   # ADD THIS LINE
+    yield
+    logger.info(f"{settings.APP_NAME} shutting down...")

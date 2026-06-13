@@ -626,3 +626,31 @@
 @keyframes exportSpin {
   to { transform: rotate(360deg); }
 }
+
+.badgePending {
+  background: #fef9c3;
+  color: #854d0e;
+}
+.badgeFlagged {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.actionBtnApprove {
+  font-size: 12px;
+  font-weight: 500;
+  color: #1a7c4a;
+  background: #e6f7ee;
+  border: none;
+  cursor: pointer;
+  padding: 3px 10px;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+}
+.actionBtnApprove:hover:not(:disabled) {
+  background: #c6edd8;
+}
+.actionBtnApprove:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

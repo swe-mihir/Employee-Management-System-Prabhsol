@@ -18,9 +18,14 @@ def get_employees(
     q = db.query(Employee)
 
     if status == "current":
-        q = q.filter(Employee.is_active == True)
+        q = q.filter(
+            Employee.is_active == True,
+            Employee.status == "active"
+        )
     elif status == "left":
         q = q.filter(Employee.is_active == False)
+    elif status == "pending":
+        q = q.filter(Employee.status.in_(["pending", "flagged"]))
     # "all" — no filter
 
     # Sorting — only allow known columns to prevent injection
@@ -61,3 +66,12 @@ def update_employee(db: Session, employee: Employee, data: dict) -> Employee:
         setattr(employee, key, value)
     db.flush()
     return employee
+
+def approve_employee(db: Session, employee_id: str) -> Optional[Employee]:
+    emp = get_employee_by_id(db, employee_id)
+    if not emp:
+        return None
+    emp.status = "active"
+    emp.approve_before = None
+    db.flush()
+    return emp

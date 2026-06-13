@@ -21,3 +21,5 @@ class Employee(Base):
     pan_no           = Column(String(10), unique=True)
     pf_no            = Column(String(12))
     ip_no            = Column(String(12))
+    status         = Column(String(20), nullable=False, default="active")
+    approve_before = Column(Date)

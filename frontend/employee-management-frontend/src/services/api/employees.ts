@@ -22,6 +22,8 @@ export interface Employee {
   pan_no: string | null;
   pf_no: string | null;
   ip_no: string | null;
+  status: string;
+  approve_before: string | null;
 }
 
 export interface EmployeeListResponse {
@@ -43,6 +45,8 @@ export interface EmployeeCreate {
   pan_no?: string;
   pf_no?: string;
   ip_no?: string;
+  status?: string;
+  approve_before?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -104,6 +108,14 @@ export async function updateEmployee(
     method: "PUT",
     headers: authHeaders(),
     body: JSON.stringify(payload),
+  });
+  return handleResponse<Employee>(res);
+}
+
+export async function approveEmployee(id: string): Promise<Employee> {
+  const res = await fetch(`${API_BASE}/employees/${id}/approve`, {
+    method: "POST",
+    headers: authHeaders(),
   });
   return handleResponse<Employee>(res);
 }

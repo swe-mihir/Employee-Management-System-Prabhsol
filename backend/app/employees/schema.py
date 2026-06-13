@@ -20,6 +20,8 @@ class EmployeeCreate(BaseModel):
     pan_no: Optional[str] = None
     pf_no: Optional[str] = None
     ip_no: Optional[str] = None
+    status: Optional[str] = "active"
+    approve_before: Optional[date] = None
 
 
 # ── Update (all fields optional) ───────────────────────────────────────────
@@ -40,6 +42,8 @@ class EmployeeUpdate(BaseModel):
     pan_no: Optional[str] = None
     pf_no: Optional[str] = None
     ip_no: Optional[str] = None
+    status: Optional[str] = None
+    approve_before: Optional[date] = None
 
 
 # ── Response ───────────────────────────────────────────────────────────────
@@ -63,6 +67,8 @@ class EmployeeResponse(BaseModel):
     ip_no: Optional[str] = None
 
     model_config = {"from_attributes": True}
+    status: str
+    approve_before: Optional[date] = None
 
 
 # ── List item (lighter, for table rows) ───────────────────────────────────
@@ -86,6 +92,8 @@ class EmployeeListItem(BaseModel):
     ip_no: Optional[str] = None
 
     model_config = {"from_attributes": True}
+    status: str
+    approve_before: Optional[date] = None
 
 
 class EmployeeListResponse(BaseModel):

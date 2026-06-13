@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from app.employees import repository
 from app.employees.schema import EmployeeCreate, EmployeeListResponse, EmployeeResponse
-
+from app.employees.model import Employee
 
 def list_employees(
     db: Session,
@@ -46,6 +46,25 @@ def update_employee(db: Session, employee_id: str, payload) -> EmployeeResponse:
     # Convert empty strings to None for optional fields
     data = {k: (None if v == "" else v) for k, v in data.items()}
     emp = repository.update_employee(db, emp, data)
+    db.commit()
+    db.refresh(emp)
+    return EmployeeResponse.model_validate(emp)
+
+def flag_overdue_employees(db: Session) -> int:
+    from sqlalchemy import update
+    from datetime import date
+    result = db.execute(
+        update(Employee)
+        .where(Employee.status == "pending", Employee.approve_before < date.today())
+        .values(status="flagged")
+    )
+    db.commit()
+    return result.rowcount
+
+def approve_employee(db: Session, employee_id: str) -> EmployeeResponse:
+    emp = repository.approve_employee(db, employee_id)
+    if not emp:
+        raise ValueError("Employee not found")
     db.commit()
     db.refresh(emp)
     return EmployeeResponse.model_validate(emp)
