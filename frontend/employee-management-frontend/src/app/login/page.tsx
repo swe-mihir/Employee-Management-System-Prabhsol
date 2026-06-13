@@ -1,5 +1,4 @@
 "use client";
-import dynamic from "next/dynamic";
 import { useState, FormEvent } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import styles from "./login.module.css";

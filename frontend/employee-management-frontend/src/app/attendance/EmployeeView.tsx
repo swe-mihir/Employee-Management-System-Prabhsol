@@ -171,11 +171,11 @@ export default function EmployeeView() {
             ) : records.length === 0 ? (
               <tr><td colSpan={36} className={styles.emptyCell}>No records for this month.</td></tr>
             ) : records.map((r, i) => (
-              <tr key={r.emp_code} className={styles.tr}>
+              <tr key={r.employee_id} className={styles.tr}>
                 <td className={styles.td} style={{ textAlign: "center", fontSize: 12, color: "var(--text-muted)" }}>{i + 1}</td>
                 <td className={styles.td} style={{ fontSize: 12, color: "var(--text-secondary)" }}>{r.emp_code}</td>
                 <td className={styles.td} style={{ fontSize: 13 }}>{r.name}</td>
-                +{Array.from({ length: 31 }, (_, di) => (
+                {Array.from({ length: 31 }, (_, di) => (
                   <td key={di} className={styles.tdDay}>
                     <Cell status={(r.days[di + 1] ?? null) as AttendanceStatus | null} grayed={di >= count} />
                   </td>
