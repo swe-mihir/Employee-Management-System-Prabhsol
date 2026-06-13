@@ -1,5 +1,6 @@
 import uuid
 from sqlalchemy import Column, String, Date, Boolean, UUID
+from sqlalchemy import Numeric
 from app.db.base import Base
 
 class Employee(Base):
@@ -23,3 +24,5 @@ class Employee(Base):
     ip_no            = Column(String(12))
     status         = Column(String(20), nullable=False, default="active")
     approve_before = Column(Date)
+    emp_code         = Column(String(20), unique=True)
+    required_hours   = Column(Numeric(4, 2))

@@ -109,7 +109,7 @@ const EMPTY_CREATE: EmployeeCreate = {
   name: "", join_date: "", date_of_birth: "", department: "",
   designation: "", personal_phone: "", work_phone: "",
   personal_email: "", work_email: "", aadhar_no: "", pan_no: "",
-  pf_no: "", ip_no: "", status: "active", approve_before: "",
+  pf_no: "", ip_no: "", status: "active", approve_before: "", emp_code: "", required_hours: ""
 };
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -630,6 +630,8 @@ export default function EmployeesPage() {
                   <Field label="Department"    value={addForm.department ?? ""} onChange={v => setAddForm(f => ({ ...f, department: v }))} />
                   <Field label="Designation"   value={addForm.designation ?? ""} onChange={v => setAddForm(f => ({ ...f, designation: v }))} />
                   <Field label="Join Date *"   type="date" value={addForm.join_date} onChange={v => setAddForm(f => ({ ...f, join_date: v }))} />
+                  <Field label="Employee Code" value={addForm.emp_code ?? ""} onChange={v => setAddForm(f => ({ ...f, emp_code: v }))} />
+                  <Field label="Required Hours" type="number" value={String(addForm.required_hours ?? "")} onChange={v => setAddForm(f => ({ ...f, required_hours: v }))} />
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Initial Status</label>
                   <select className={styles.fieldInput}

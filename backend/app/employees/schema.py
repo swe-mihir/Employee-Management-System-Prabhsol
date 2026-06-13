@@ -2,7 +2,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import date
 import uuid
-
+from decimal import Decimal
 
 # ── Create ─────────────────────────────────────────────────────────────────
 
@@ -22,6 +22,8 @@ class EmployeeCreate(BaseModel):
     ip_no: Optional[str] = None
     status: Optional[str] = "active"
     approve_before: Optional[date] = None
+    emp_code: Optional[str] = None  
+    required_hours: Optional[Decimal] = None
 
 
 # ── Update (all fields optional) ───────────────────────────────────────────
@@ -44,6 +46,8 @@ class EmployeeUpdate(BaseModel):
     ip_no: Optional[str] = None
     status: Optional[str] = None
     approve_before: Optional[date] = None
+    emp_code: Optional[str] = None  
+    required_hours: Optional[Decimal] = None
 
 
 # ── Response ───────────────────────────────────────────────────────────────
@@ -69,6 +73,8 @@ class EmployeeResponse(BaseModel):
     model_config = {"from_attributes": True}
     status: str
     approve_before: Optional[date] = None
+    emp_code: Optional[str] = None  
+    required_hours: Optional[Decimal] = None
 
 
 # ── List item (lighter, for table rows) ───────────────────────────────────
@@ -94,6 +100,8 @@ class EmployeeListItem(BaseModel):
     model_config = {"from_attributes": True}
     status: str
     approve_before: Optional[date] = None
+    emp_code: Optional[str] = None  
+    required_hours: Optional[Decimal] = None
 
 
 class EmployeeListResponse(BaseModel):

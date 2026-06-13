@@ -47,6 +47,8 @@ export interface EmployeeCreate {
   ip_no?: string;
   status?: string;
   approve_before?: string;
+  emp_code?: string;
+  required_hours?: string;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────

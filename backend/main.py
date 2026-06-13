@@ -10,6 +10,7 @@ from app.auth.router import router as auth_router
 from fastapi.security import HTTPBearer
 import asyncio
 from datetime import date, datetime, timedelta
+from app.attendance.router import router as attendance_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -44,7 +45,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.include_router(employees_router)
-
+app.include_router(attendance_router)
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema
