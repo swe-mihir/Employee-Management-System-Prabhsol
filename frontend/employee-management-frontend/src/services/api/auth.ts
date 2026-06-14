@@ -11,6 +11,7 @@ export interface TokenResponse {
 
 export interface UserInfo {
   user_id: number;
+  employee_name: string;
   email: string;
   roles: string[];
   permissions: string[];

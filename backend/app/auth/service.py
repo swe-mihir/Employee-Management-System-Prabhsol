@@ -11,7 +11,8 @@ from app.core.security import (
 from app.auth.schema import TokenResponse, UserInfo, MeResponse
 from app.auth import repository as auth_repo
 from app.users.model import User
-
+from app.employees.model import Employee
+from sqlalchemy import select
 
 def _build_token_response(user: User, roles: list[str], permissions: list[str]) -> TokenResponse:
     token_data = TokenData(
@@ -73,6 +74,12 @@ def get_me(db: Session, user_id: int, roles: list[str], permissions: list[str]) 
     if not user or not user.is_active:
         raise ValueError("Account not found or disabled")
 
+    emp_name = ""
+    if user.employee_id:
+        emp = db.execute(select(Employee).where(Employee.id == user.employee_id)).scalar_one_or_none()
+        if emp:
+            emp_name = emp.name
+
     token_data = TokenData(
         user_id=user.id,
         email=user.email,
@@ -84,6 +91,7 @@ def get_me(db: Session, user_id: int, roles: list[str], permissions: list[str]) 
         user=UserInfo(
             id=user.id,
             employee_id=str(user.employee_id),
+            employee_name=emp_name,
             email=user.email,
             roles=roles,
             permissions=permissions

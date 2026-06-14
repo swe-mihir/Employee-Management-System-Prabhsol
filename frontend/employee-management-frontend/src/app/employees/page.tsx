@@ -1,4 +1,6 @@
 "use client";
+import { useRoleGuard } from '@/hooks/useRoleGuard';
+import { useRouter } from 'next/navigation';
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import AppShell from "@/components/layout/AppShell";
@@ -115,6 +117,8 @@ const EMPTY_CREATE: EmployeeCreate = {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function EmployeesPage() {
+  useRoleGuard(['admin', 'manager'], '/attendance');
+
   const [employees, setEmployees]     = useState<Employee[]>([]);
   const [total, setTotal]             = useState(0);
   const [loading, setLoading]         = useState(true);

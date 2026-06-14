@@ -2,21 +2,40 @@
 
 import { usePathname } from 'next/navigation';
 import styles from './Navbar.module.css';
-
-const pageTitles: Record<string, { title: string; description: string }> = {
-  '/dashboard':  { title: 'Dashboard',  description: 'Overview of workforce activity' },
-  '/employees':  { title: 'Employees',  description: 'Manage employee records' },
-  '/attendance': { title: 'Attendance', description: 'Track and review attendance' },
-  '/payroll':    { title: 'Payroll',    description: 'Process and manage payroll runs' },
-  '/salary':     { title: 'Salary',     description: 'Salary structures and revisions' },
-  '/users':      { title: 'Users',      description: 'System user access and roles' },
-  '/settings':   { title: 'Settings',   description: 'System configuration' },
-};
+import { useUser, useIsEmployee } from '@/hooks/useUser';
 
 export default function Navbar() {
   const pathname = usePathname();
+  const user = useUser();
+  const isEmp = useIsEmployee();
   const base = '/' + (pathname.split('/')[1] || '');
+
+  const pageTitles: Record<string, { title: string; description: string }> = {
+    '/dashboard':  { title: 'Dashboard',  description: 'Overview of workforce activity' },
+    '/employees':  { title: 'Employees',  description: 'Manage employee records' },
+    '/attendance': isEmp
+      ? { title: 'My Attendance', description: 'Your attendance records' }
+      : { title: 'Attendance',    description: 'Track and review attendance' },
+    '/payroll':    { title: 'Payroll',    description: 'Process and manage payroll runs' },
+    '/salary': isEmp
+      ? { title: 'My Payslips', description: 'Your salary and payslip history' }
+      : { title: 'Salary',      description: 'Salary structures and revisions' },
+    '/users':      { title: 'Users',      description: 'System user access and roles' },
+    '/settings':   { title: 'Settings',   description: 'System configuration' },
+  };
+
   const page = pageTitles[base] ?? { title: 'Prabhsol', description: '' };
+
+  function getInitials(name: string, email: string) {
+    if (name) {
+      const parts = name.trim().split(/\s+/);
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      return parts[0].slice(0, 2).toUpperCase();
+    }
+    return (email || 'U').slice(0, 2).toUpperCase();
+  }
+
+  const initials = getInitials(user?.employee_name ?? '', user?.email ?? '');
 
   return (
     <header className={styles.navbar}>
@@ -40,7 +59,7 @@ export default function Navbar() {
           <span className={styles.badge}>3</span>
         </button>
         <div className={styles.avatarBtn}>
-          <div className={styles.avatar}>MM</div>
+          <div className={styles.avatar}>{initials}</div>
         </div>
       </div>
     </header>

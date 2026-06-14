@@ -6,15 +6,17 @@ from sqlalchemy import text
 from app.core.config import settings
 from app.core.logging import setup_logging, logger
 from app.db.session import engine
-from app.auth.router import router as auth_router
+
 from fastapi.security import HTTPBearer
 import asyncio
 from datetime import date, datetime, timedelta
-from app.attendance.router import router as attendance_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth.router import router as auth_router
 from app.employees.router import router as employees_router
+from app.attendance.router import router as attendance_router
+from app.users.router import router as users_router
 
 security = HTTPBearer()
 
@@ -44,8 +46,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 app.include_router(employees_router)
 app.include_router(attendance_router)
+app.include_router(users_router)
+
 def custom_openapi():
     if app.openapi_schema:
         return app.openapi_schema

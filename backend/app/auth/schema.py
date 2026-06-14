@@ -26,6 +26,7 @@ class TokenResponse(BaseModel):
 class UserInfo(BaseModel):
     id: int
     employee_id: str
+    employee_name: str
     email: str
     roles: list[str]
     permissions: list[str]

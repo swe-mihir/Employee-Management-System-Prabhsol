@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { login as apiLogin, ApiError } from "@/services/api/auth";
-import { saveSession, clearSession } from "@/lib/tokenStorage";
+import { login as apiLogin, getMe, ApiError } from "@/services/api/auth";
+import { saveSession, clearSession, setStoredUser } from "@/lib/tokenStorage";
 
 interface UseAuthReturn {
   loading: boolean;
@@ -23,8 +23,14 @@ export function useAuth(): UseAuthReturn {
 
     try {
       const tokens = await apiLogin(email, password);
+      const me = await getMe(tokens.access_token);
       saveSession(tokens.access_token, tokens.refresh_token);
-      router.push("/dashboard");
+      setStoredUser(me.user);
+      const isEmployee =
+        me.user.roles.includes("employee") &&
+        !me.user.roles.includes("admin") &&
+        !me.user.roles.includes("manager");
+      router.push(isEmployee ? "/attendance" : "/dashboard");
     } catch (err) {
       if (err instanceof ApiError) {
         // 401 → backend returns "Invalid credentials"
