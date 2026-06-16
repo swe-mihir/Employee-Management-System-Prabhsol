@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from datetime import date
-
+from typing import Optional
 from app.attendance.schema import AttendanceDailyResponse, AttendanceMonthResponse
 from app.attendance import service as attendance_service
 from app.auth.deps import get_current_user
@@ -14,17 +14,19 @@ router = APIRouter(prefix="/attendance", tags=["Attendance"])
 @router.get("/daily", response_model=AttendanceDailyResponse)
 def get_daily(
     date: date = Query(default_factory=date.today),
-    current_user: TokenData = Depends(get_current_user),
+   current_user: TokenData = Depends(get_current_user),
+   employee_id: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return attendance_service.get_daily(db, date)
+   return attendance_service.get_daily(db, date, employee_id)
 
 
 @router.get("/monthly", response_model=AttendanceMonthResponse)
 def get_monthly(
     year: int = Query(default_factory=lambda: date.today().year),
     month: int = Query(default_factory=lambda: date.today().month, ge=1, le=12),
-    current_user: TokenData = Depends(get_current_user),
+   current_user: TokenData = Depends(get_current_user),
+   employee_id: Optional[str] = Query(default=None),
     db: Session = Depends(get_db),
 ):
-    return attendance_service.get_monthly(db, year, month)
+   return attendance_service.get_monthly(db, year, month, employee_id)

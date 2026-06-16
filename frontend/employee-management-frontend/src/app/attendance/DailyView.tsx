@@ -6,6 +6,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { fetchDailyAttendance, DailyAttendanceItem } from "@/services/api/attendance";
+import { getStoredUser } from "@/lib/tokenStorage";
 
 type AttendanceStatus = "P" | "A" | "SL" | "PL" | "WH";
 type DailyRecord = DailyAttendanceItem;
@@ -71,18 +72,24 @@ export default function DailyView() {
   const exportRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
+  const storedUser = getStoredUser();
+  const isEmployee = (storedUser?.roles ?? []).includes("employee") &&
+    !(storedUser?.roles ?? []).includes("admin") &&
+    !(storedUser?.roles ?? []).includes("manager");
+  const selfEmployeeId = isEmployee ? storedUser?.employee_id : undefined;
+
   const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchDailyAttendance(date);
-      setRecords(data.items);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed to load attendance");
-    } finally {
-      setLoading(false);
-    }
-  }, [date]);
+     setLoading(true);
+     setError(null);
+     try {
+      const data = await fetchDailyAttendance(date, selfEmployeeId);
+       setRecords(data.items);
+     } catch (e: unknown) {
+       setError(e instanceof Error ? e.message : "Failed to load attendance");
+     } finally {
+       setLoading(false);
+     }
+  }, [date, selfEmployeeId]);
 
   useEffect(() => { load(); }, [load]);
 

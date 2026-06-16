@@ -53,16 +53,20 @@ export interface MonthAttendanceResponse {
   items: MonthAttendanceItem[];
 }
 
-export async function fetchDailyAttendance(date: string): Promise<DailyAttendanceResponse> {
-  const res = await fetch(`${API_BASE}/attendance/daily?date=${date}`, {
-    headers: authHeaders(),
-  });
-  return handleResponse<DailyAttendanceResponse>(res);
-}
+export async function fetchDailyAttendance(date: string, employeeId?: string): Promise<DailyAttendanceResponse> {
+  const params = new URLSearchParams({ date });
+  if (employeeId) params.set("employee_id", employeeId);
+  const res = await fetch(`${API_BASE}/attendance/daily?${params}`, {
+     headers: authHeaders(),
+   });
+   return handleResponse<DailyAttendanceResponse>(res);
+ }
 
-export async function fetchMonthlyAttendance(year: number, month: number): Promise<MonthAttendanceResponse> {
-  const res = await fetch(`${API_BASE}/attendance/monthly?year=${year}&month=${month}`, {
-    headers: authHeaders(),
-  });
-  return handleResponse<MonthAttendanceResponse>(res);
-}
+export async function fetchMonthlyAttendance(year: number, month: number, employeeId?: string): Promise<MonthAttendanceResponse> {
+  const params = new URLSearchParams({ year: String(year), month: String(month) });
+  if (employeeId) params.set("employee_id", employeeId);
+  const res = await fetch(`${API_BASE}/attendance/monthly?${params}`, {
+     headers: authHeaders(),
+   });
+   return handleResponse<MonthAttendanceResponse>(res);
+ }

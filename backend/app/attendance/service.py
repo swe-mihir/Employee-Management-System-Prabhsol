@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from datetime import date
 import calendar
-
+from typing import Optional
 from app.attendance import repository
 from app.attendance.schema import (
     AttendanceDailyItem,
@@ -21,8 +21,8 @@ STATUS_MAP = {
 }
 
 
-def get_daily(db: Session, target_date: date) -> AttendanceDailyResponse:
-    rows = repository.get_daily_attendance(db, target_date)
+def get_daily(db: Session, target_date: date, employee_id: Optional[str] = None) -> AttendanceDailyResponse:
+    rows = repository.get_daily_attendance(db, target_date, employee_id)
     items = []
 
     for att, name, emp_code, required_hours in rows:
@@ -47,8 +47,8 @@ def get_daily(db: Session, target_date: date) -> AttendanceDailyResponse:
     )
 
 
-def get_monthly(db: Session, year: int, month: int) -> AttendanceMonthResponse:
-    rows = repository.get_monthly_attendance(db, year, month)
+def get_monthly(db: Session, year: int, month: int, employee_id: Optional[str] = None) -> AttendanceMonthResponse:
+    rows = repository.get_monthly_attendance(db, year, month, employee_id)
     days_in_month = calendar.monthrange(year, month)[1]
 
     emp_map: dict[str, AttendanceMonthItem] = {}

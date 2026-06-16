@@ -5,6 +5,7 @@ import styles from "./attendance.module.css";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getStoredUser } from "@/lib/tokenStorage";
 
 import { fetchMonthlyAttendance, MonthAttendanceItem } from "@/services/api/attendance";
 
@@ -41,11 +42,17 @@ export default function EmployeeView() {
   const [count, setCount] = useState(daysInMonth(year, month));
   const monthStr = toMonthStr(year, month);
 
+  const storedUser = getStoredUser();
+  const isEmployee = (storedUser?.roles ?? []).includes("employee") &&
+    !(storedUser?.roles ?? []).includes("admin") &&
+    !(storedUser?.roles ?? []).includes("manager");
+  const selfEmployeeId = isEmployee ? storedUser?.employee_id : undefined;
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchMonthlyAttendance(year, month);
+      const data = await fetchMonthlyAttendance(year, month, selfEmployeeId);
       setCount(data.days_in_month);
       setRecords(data.items);
     } catch (e: unknown) {
@@ -53,7 +60,7 @@ export default function EmployeeView() {
     } finally {
       setLoading(false);
     }
-  }, [year, month]);
+  }, [year, month, selfEmployeeId]);
 
   useEffect(() => { load(); }, [load]);
 
