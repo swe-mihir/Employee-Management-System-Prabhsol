@@ -17,6 +17,7 @@ from app.auth.router import router as auth_router
 from app.employees.router import router as employees_router
 from app.attendance.router import router as attendance_router
 from app.users.router import router as users_router
+from app.payroll.router import router as payroll_router
 
 security = HTTPBearer()
 
@@ -50,6 +51,7 @@ app.add_middleware(
 app.include_router(employees_router)
 app.include_router(attendance_router)
 app.include_router(users_router)
+app.include_router(payroll_router)
 
 def custom_openapi():
     if app.openapi_schema:
