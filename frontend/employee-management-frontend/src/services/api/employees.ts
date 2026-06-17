@@ -24,6 +24,7 @@ export interface Employee {
   ip_no: string | null;
   status: string;
   approve_before: string | null;
+  emp_code: string | null;
 }
 
 export interface EmployeeListResponse {

@@ -68,6 +68,7 @@ type EditForm = {
   ip_no: string;
   status: string;
   approve_before: string;
+  emp_code: string;
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -104,6 +105,7 @@ function empToEditForm(emp: Employee): EditForm {
     ip_no:          emp.ip_no ?? "",
     status:         emp.status ?? "active",
     approve_before: emp.approve_before ?? "",
+    emp_code: emp.emp_code ?? "",
   };
 }
 
@@ -634,7 +636,6 @@ export default function EmployeesPage() {
                   <Field label="Department"    value={addForm.department ?? ""} onChange={v => setAddForm(f => ({ ...f, department: v }))} />
                   <Field label="Designation"   value={addForm.designation ?? ""} onChange={v => setAddForm(f => ({ ...f, designation: v }))} />
                   <Field label="Join Date *"   type="date" value={addForm.join_date} onChange={v => setAddForm(f => ({ ...f, join_date: v }))} />
-                  <Field label="Employee Code" value={addForm.emp_code ?? ""} onChange={v => setAddForm(f => ({ ...f, emp_code: v }))} />
                   <Field label="Required Hours" type="number" value={String(addForm.required_hours ?? "")} onChange={v => setAddForm(f => ({ ...f, required_hours: v }))} />
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Initial Status</label>
@@ -664,6 +665,7 @@ export default function EmployeesPage() {
                   <Field label="PAN No"    value={addForm.pan_no ?? ""}    onChange={v => setAddForm(f => ({ ...f, pan_no: v }))} />
                   <Field label="PF No"     value={addForm.pf_no ?? ""}     onChange={v => setAddForm(f => ({ ...f, pf_no: v }))} />
                   <Field label="IP No"     value={addForm.ip_no ?? ""}     onChange={v => setAddForm(f => ({ ...f, ip_no: v }))} />
+                  <Field label="Employee Code" value={addForm.emp_code ?? ""} onChange={v => setAddForm(f => ({ ...f, emp_code: v }))} />
                 </div>
               </div>
             </div>
@@ -761,6 +763,7 @@ export default function EmployeesPage() {
                   <Field label="PAN No"    value={editForm.pan_no}    onChange={v => setEditForm(f => f && ({ ...f, pan_no: v }))} />
                   <Field label="PF No"     value={editForm.pf_no}     onChange={v => setEditForm(f => f && ({ ...f, pf_no: v }))} />
                   <Field label="IP No"     value={editForm.ip_no}     onChange={v => setEditForm(f => f && ({ ...f, ip_no: v }))} />
+                  <Field label="Employee Code"     value={editForm.emp_code}     onChange={v => setEditForm(f => f && ({ ...f, emp_code: v }))} />  
                 </div>
               </div>
             </div>

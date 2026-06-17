@@ -13,6 +13,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import styles from "./payroll.module.css";
+import { generatePayslip } from "@/lib/generatePayslip";
 
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -176,9 +177,20 @@ export default function PayrollPage() {
   const [addSaving, setAddSaving] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
 
+  const [salaryStructureError, setSalaryStructureError] = useState<string | null>(null);
+  
   const exportRef = useRef<HTMLDivElement>(null);
   const colRef = useRef<HTMLDivElement>(null);
   const empDropRef = useRef<HTMLDivElement>(null);
+
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkCalcOpen, setBulkCalcOpen] = useState(false);
+  const [bulkCalcLoading, setBulkCalcLoading] = useState(false);  
+
+  const [bulkPayOpen, setBulkPayOpen] = useState(false);
+  const [bulkPayLoading, setBulkPayLoading] = useState(false);
+
+  const [payslipExporting, setPayslipExporting] = useState(false);
 
   // Load active employees for filters/add modal
   useEffect(() => {
@@ -187,21 +199,42 @@ export default function PayrollPage() {
       .catch(() => {});
   }, []);
 
+  // Clear checked selection whenever records reload
+  useEffect(() => { setCheckedIds(new Set()); }, [records]);
+
   // Load salary structure when employee selected in add modal
   useEffect(() => {
-    if (!addForm.employee_id) return;
+    if (!addForm.employee_id) { setSalaryStructureError(null); return; }
     getSalaryStructure(addForm.employee_id).then(s => {
-      setAddForm(f => ({
-        ...f,
-        basic_allowance: String(s.basic_allowance),
-        hra_allowance: String(s.hra_allowance),
-        conveyance_allowance: String(s.conveyance_allowance),
-        medical_allowance: String(s.medical_allowance),
-      }));
+      // Check if selected month/year falls within effective_from..effective_to
+      const selected = new Date(addForm.year, addForm.month - 1, 1);
+      const from = new Date(s.effective_from);
+      from.setDate(1); from.setHours(0, 0, 0, 0);
+      const to = s.effective_to ? new Date(s.effective_to) : null;
+      if (to) { to.setDate(1); to.setHours(23, 59, 59, 999); }
+
+      if (selected < from || (to && selected > to)) {
+        const fromLabel = from.toLocaleDateString("en-IN", { month: "short", year: "numeric" });
+        const toLabel = to ? to.toLocaleDateString("en-IN", { month: "short", year: "numeric" }) : "present";
+        setSalaryStructureError(
+          `No active salary structure for this month. Structure is valid from ${fromLabel} to ${toLabel}.`
+        );
+        setAddForm(f => ({ ...f, basic_allowance: "", hra_allowance: "", conveyance_allowance: "", medical_allowance: "" }));
+      } else {
+        setSalaryStructureError(null);
+        setAddForm(f => ({
+          ...f,
+          basic_allowance: String(s.basic_allowance),
+          hra_allowance: String(s.hra_allowance),
+          conveyance_allowance: String(s.conveyance_allowance),
+          medical_allowance: String(s.medical_allowance),
+        }));
+      }
     }).catch(() => {
+      setSalaryStructureError("No salary structure found for this employee.");
       setAddForm(f => ({ ...f, basic_allowance: "", hra_allowance: "", conveyance_allowance: "", medical_allowance: "" }));
     });
-  }, [addForm.employee_id]);
+  }, [addForm.employee_id, addForm.month, addForm.year]);
 
   // Close dropdowns on outside click
   useEffect(() => {
@@ -313,6 +346,124 @@ export default function PayrollPage() {
       setPayLoading(false);
     }
   }
+
+  async function handleBulkCalculate() {
+    setBulkCalcLoading(true);
+    const ids = [...checkedIds].filter(id => records.find(r => r.id === id)?.status === "calculated");
+    const errors: string[] = [];
+    const updated: PayrollRecord[] = [];
+    for (const id of ids) {
+      try {
+        const result = await calculatePayroll(id);
+        updated.push(result);
+      } catch (e: unknown) {
+        errors.push(e instanceof Error ? e.message : `Failed for id ${id}`);
+      }
+    }
+    setRecords(rs => rs.map(r => {
+      const u = updated.find(u => u.id === r.id);
+      return u ?? r;
+    }));
+    if (selectedRecord) {
+      const u = updated.find(u => u.id === selectedRecord.id);
+      if (u) setSelectedRecord(u);
+    }
+    setCheckedIds(new Set());
+    setBulkCalcOpen(false);
+    setBulkCalcLoading(false);
+    if (errors.length) setError(errors.join("; "));
+  }  
+
+  async function handleBulkMarkPaid() {
+    setBulkPayLoading(true);
+    const ids = [...checkedIds];
+    const errors: string[] = [];
+    const updated: PayrollRecord[] = [];
+    for (const id of ids) {
+      try {
+        const result = await markPayrollPaid(id);
+        updated.push(result);
+      } catch (e: unknown) {
+        errors.push(e instanceof Error ? e.message : `Failed for id ${id}`);
+      }
+    }
+    setRecords(rs => rs.map(r => {
+      const u = updated.find(u => u.id === r.id);
+      return u ?? r;
+    }));
+    if (selectedRecord) {
+      const u = updated.find(u => u.id === selectedRecord.id);
+      if (u) setSelectedRecord(u);
+    }
+    setCheckedIds(new Set());
+    setBulkPayOpen(false);
+    setBulkPayLoading(false);
+    if (errors.length) setError(errors.join("; "));
+  }  
+
+async function handleExportPayslips() {
+  const paidIds = [...checkedIds].filter(
+    id => records.find(r => r.id === id)?.status === "paid"
+  );
+  if (!paidIds.length) return;
+  setPayslipExporting(true);
+  const missing: string[] = [];
+  try {
+    for (const id of paidIds) {
+      const record = records.find(r => r.id === id)!;
+
+      // Validate payroll computed fields
+      const requiredFields: { key: keyof PayrollRecord; label: string }[] = [
+        { key: "ern_basic",        label: "Basic Allowance" },
+        { key: "ern_hra",          label: "HRA Allowance" },
+        { key: "ern_conveyance",   label: "Conveyance Allowance" },
+        { key: "ern_medical",      label: "Medical Allowance" },
+        { key: "emp_pf",           label: "Employee PF" },
+        { key: "emp_esic",         label: "Employee ESIC" },
+        { key: "pt",               label: "PT" },
+        { key: "gross_salary",     label: "Gross Salary" },
+        { key: "total_deductions", label: "Total Deductions" },
+        { key: "net_salary",       label: "Net Salary" },
+        { key: "days_present",     label: "Paid Days" },
+      ];
+      const emptyFields = requiredFields
+        .filter(f => record[f.key] == null)
+        .map(f => f.label);
+      if (emptyFields.length) {
+        missing.push(`${record.employee_name} (${MONTH_NAMES[record.month - 1]} ${record.year}): missing ${emptyFields.join(", ")}`);
+        continue;
+      }
+
+      // Validate employee identity fields
+      const emp = activeEmployees.find(e => e.id === record.employee_id);
+      const requiredEmpFields: { key: keyof Employee; label: string }[] = [
+        { key: "aadhar_no", label: "Aadhar No." },
+        { key: "pan_no",    label: "PAN No." },
+        { key: "pf_no",     label: "PF No. (UAN)" },
+        { key: "ip_no",     label: "Employee IP Number" },
+        { key: "join_date", label: "Joining Date" },
+      ];
+      const emptyEmpFields = emp
+        ? requiredEmpFields.filter(f => !emp[f.key]).map(f => f.label)
+        : ["Employee record not found"];
+      if (emptyEmpFields.length) {
+        missing.push(`${record.employee_name} (${MONTH_NAMES[record.month - 1]} ${record.year}): missing ${emptyEmpFields.join(", ")}`);
+        continue;
+      }
+
+      const doc = generatePayslip(record, emp!);
+      const monthStr = String(record.month).padStart(2, "0");
+      doc.save(`payslip_${record.employee_name.replace(/\s+/g, "_")}_${record.year}_${monthStr}.pdf`);
+    }
+  } catch (e: unknown) {
+    setError(e instanceof Error ? e.message : "Payslip export failed");
+  } finally {
+    setPayslipExporting(false);
+    if (missing.length) {
+      setError(`Could not export payslip for:\n${missing.join("\n")}`);
+    }
+  }
+}  
 
   async function handleAdd() {
     if (!addForm.employee_id) { setAddError("Select an employee."); return; }
@@ -465,8 +616,34 @@ export default function PayrollPage() {
             </div>
           </div>
 
-          <div className={styles.topBarRight}>
-            <button className={styles.btnPrimary} onClick={() => { setAddError(null); setAddForm({ employee_id: "", month, year, ot_hours: 0, advance: 0, loan: 0, tds: 0, employee_mlwf: 0, employer_mlwf: 0, incentive: 0 }); setAddOpen(true); }}>
+         <div className={styles.topBarRight}>
+            {checkedIds.size > 0 && (() => {
+              const pendingCount = records.filter(r => r.status === "pending" && checkedIds.has(r.id)).length;
+              const calculatedCount = records.filter(r => r.status === "calculated" && checkedIds.has(r.id)).length;
+              return (
+                <>
+                  {pendingCount > 0 && (
+                    <button className={styles.btnPrimary} onClick={() => setBulkCalcOpen(true)}>
+                      Calculate ({pendingCount})
+                   </button>
+                  )}
+                  {calculatedCount > 0 && (
+                    <button className={styles.btnPrimary} style={{ background: "#1a7c4a" }} onClick={() => setBulkPayOpen(true)}>
+                      Mark Paid ({calculatedCount})
+                   </button>
+                  )}
+                  {(() => {
+                    const paidCount = records.filter(r => r.status === "paid" && checkedIds.has(r.id)).length;
+                    return paidCount > 0 ? (
+                      <button className={styles.btnSecondary} onClick={handleExportPayslips} disabled={payslipExporting}>
+                        {payslipExporting ? "Exporting…" : `Export Payslip (${paidCount})`}
+                      </button>
+                    ) : null;
+                  })()}
+                </>
+              );
+            })()}
+            <button className={styles.btnPrimary} onClick={() => { setAddError(null); setSalaryStructureError(null); setAddForm({ employee_id: "", month, year, ot_hours: 0, advance: 0, loan: 0, tds: 0, employee_mlwf: 0, employer_mlwf: 0, incentive: 0 }); setAddOpen(true); }}>
               + Add to Payroll
             </button>
 
@@ -527,6 +704,35 @@ export default function PayrollPage() {
               <table className={styles.table}>
                 <thead>
                   <tr>
+                    <th className={styles.th} style={{ width: 36, textAlign: "center" }}>
+                      {(() => {
+                        const calcutableIds = records
+                          .filter(r => r.status === "pending" || r.status === "calculated" || r.status === "paid")                          
+                          .map(r => r.id);
+                        const allChecked = calcutableIds.length > 0 &&
+                          calcutableIds.every(id => checkedIds.has(id));
+                        const someChecked = calcutableIds.some(id => checkedIds.has(id));
+                        return (
+                          <input
+                            type="checkbox"
+                            title="Select all pending"
+                            checked={allChecked}
+                            ref={el => { if (el) el.indeterminate = someChecked && !allChecked; }}
+                            onChange={() => {
+                              if (allChecked) {
+                                setCheckedIds(prev => {
+                                  const next = new Set(prev);
+                                  calcutableIds.forEach(id => next.delete(id));
+                                  return next;
+                                });
+                              } else {
+                                setCheckedIds(prev => new Set([...prev, ...calcutableIds]));
+                              }
+                            }}
+                          />
+                        );
+                      })()}
+                    </th>
                     {activeCols.map(col => <th key={col.key} className={styles.th}>{col.label}</th>)}
                     <th className={styles.th}>Actions</th>
                   </tr>
@@ -541,6 +747,21 @@ export default function PayrollPage() {
                       className={`${styles.tr} ${selectedRecord?.id === r.id ? styles.trSelected : ""}`}
                       onClick={() => setSelectedRecord(prev => prev?.id === r.id ? null : r)}
                     >
+                      <td className={styles.td} style={{ textAlign: "center" }} onClick={e => e.stopPropagation()}>
+                        {(r.status === "pending" || r.status === "calculated" || r.status === "paid") && (
+                          <input
+                            type="checkbox"
+                            checked={checkedIds.has(r.id)}
+                            onChange={() =>
+                              setCheckedIds(prev => {
+                                const next = new Set(prev);
+                                next.has(r.id) ? next.delete(r.id) : next.add(r.id);
+                                return next;
+                              })
+                            }
+                          />
+                        )}
+                      </td>
                       {activeCols.map(col => (
                         <td key={col.key} className={styles.td}>
                           {col.key === "status" ? (
@@ -696,6 +917,11 @@ export default function PayrollPage() {
                   }
                 </select>
               </div>
+             {salaryStructureError && (
+               <p style={{ fontSize: 13, color: "var(--danger, #c0392b)", margin: "-4px 0 4px", lineHeight: 1.5 }}>
+                 ⚠ {salaryStructureError}
+               </p>
+             )}
               <div className={styles.formGrid2}>
                 <div className={styles.field}>
                   <label className={styles.fieldLabel}>Month</label>
@@ -736,8 +962,67 @@ export default function PayrollPage() {
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnSecondary} onClick={() => setAddOpen(false)}>Cancel</button>
-              <button className={styles.btnPrimary} onClick={handleAdd} disabled={addSaving}>
+              <button className={styles.btnPrimary} onClick={handleAdd} disabled={addSaving || !!salaryStructureError}>
                 {addSaving ? "Saving…" : "Add to Payroll"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* ── Bulk Calculate Confirm Modal ── */}
+      {bulkCalcOpen && (
+        <div className={styles.modalOverlay} onClick={() => setBulkCalcOpen(false)}>
+          <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Calculate Payroll</h2>
+              <button className={styles.modalClose} onClick={() => setBulkCalcOpen(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                Calculate payroll for{" "}
+                <strong style={{ color: "var(--text-primary)" }}>
+                  {checkedIds.size} selected employee{checkedIds.size !== 1 ? "s" : ""}
+                </strong>
+                ? This will run sequentially and may take a moment.
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setBulkCalcOpen(false)} disabled={bulkCalcLoading}>
+                Cancel
+              </button>
+              <button className={styles.btnPrimary} onClick={handleBulkCalculate} disabled={bulkCalcLoading}>
+                {bulkCalcLoading ? "Calculating…" : `Confirm (${checkedIds.size})`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Mark Paid Confirm Modal ── */}
+      {bulkPayOpen && (
+        <div className={styles.modalOverlay} onClick={() => setBulkPayOpen(false)}>
+          <div className={`${styles.modal} ${styles.modalSm}`} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Mark as Paid</h2>
+              <button className={styles.modalClose} onClick={() => setBulkPayOpen(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              <p style={{ fontSize: 14, color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                Mark salary as paid for{" "}
+                <strong style={{ color: "var(--text-primary)" }}>
+                  {records.filter(r => r.status === "calculated" && checkedIds.has(r.id)).length} selected employee
+                  {records.filter(r => r.status === "calculated" && checkedIds.has(r.id)).length !== 1 ? "s" : ""}
+                </strong>
+                ? This cannot be undone.
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setBulkPayOpen(false)} disabled={bulkPayLoading}>
+                Cancel
+              </button>
+              <button className={styles.btnPrimary} style={{ background: "#1a7c4a" }} onClick={handleBulkMarkPaid} disabled={bulkPayLoading}>
+                {bulkPayLoading ? "Marking…" : `Confirm (${records.filter(r => r.status === "calculated" && checkedIds.has(r.id)).length})`}
               </button>
             </div>
           </div>
