@@ -68,27 +68,68 @@ const diagram = `erDiagram
   employee_salary_structure {
     uuid id PK
     uuid employee_id FK
-    float base_salary
-    float hra
-    float transport_allowance
-    float other_allowances
-    string pay_cycle
+
+    numeric basic_allowance
+    numeric hra_allowance
+    numeric conveyance_allowance
+    numeric medical_allowance
+
+    string account_name
+    string account_number
+    string bank_ifsc_code
+    string bank_name
+    string bank_branch
+
     date effective_from
     date effective_to
   }
 
-  salary_history {
+salary_history {
     uuid id PK
     uuid employee_id FK
+
     int month
     int year
+
     int days_present
     int days_absent
     int leaves_taken
-    float gross_salary
-    float total_deductions
-    float net_salary
-    float total_ctc
+
+    numeric ot_hours
+    numeric advance
+    numeric loan
+    numeric tds
+    numeric employee_mlwf
+    numeric employer_mlwf
+    numeric incentive
+
+    numeric ern_basic
+    numeric ern_hra
+    numeric ern_conveyance
+    numeric ern_medical
+    numeric ot_amount
+
+    numeric gross_salary
+
+    numeric emp_pf
+    numeric emp_esic
+    numeric pt
+
+    numeric total_deductions
+    numeric net_salary
+
+    numeric employer_pf
+    numeric employer_admin
+    numeric employer_total_pf
+    numeric emp_employer_pf
+
+    numeric employer_esic
+    numeric emp_employer_esic
+
+    numeric emp_employer_mlwf
+
+    numeric total_ctc
+
     string status
     timestamp calculated_at
     timestamp paid_at

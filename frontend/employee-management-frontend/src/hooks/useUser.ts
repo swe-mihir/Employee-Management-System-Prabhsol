@@ -1,10 +1,17 @@
 "use client";
+
+import { useEffect, useState } from "react";
 import { getStoredUser } from "@/lib/tokenStorage";
 import type { UserInfo } from "@/services/api/auth";
 
 export function useUser(): UserInfo | null {
-  if (typeof window === "undefined") return null;
-  return getStoredUser();
+  const [user, setUser] = useState<UserInfo | null>(null);
+
+  useEffect(() => {
+    setUser(getStoredUser());
+  }, []);
+
+  return user;
 }
 
 export function useIsAdmin(): boolean {

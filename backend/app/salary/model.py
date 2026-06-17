@@ -7,13 +7,17 @@ class EmployeeSalaryStructure(Base):
 
     id                  = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     employee_id         = Column(UUID(as_uuid=True), ForeignKey("employees.id", ondelete="RESTRICT"), nullable=False)
-    base_salary         = Column(Numeric(12, 2), nullable=False)
-    hra                 = Column(Numeric(12, 2), nullable=False, default=0)
-    transport_allowance = Column(Numeric(12, 2), nullable=False, default=0)
-    other_allowances    = Column(Numeric(12, 2), nullable=False, default=0)
-    pay_cycle           = Column(String(20), nullable=False, default="monthly")
+    basic_allowance     = Column(Numeric(12, 2), nullable=False, default=0)
+    hra_allowance       = Column(Numeric(12, 2), nullable=False, default=0)
+    conveyance_allowance = Column(Numeric(12, 2), nullable=False, default=0)
+    medical_allowance   = Column(Numeric(12, 2), nullable=False, default=0)
     effective_from      = Column(Date, nullable=False)
     effective_to        = Column(Date)
+    account_name        = Column(String(255))
+    account_number      = Column(String(50))
+    bank_ifsc_code      = Column(String(20))
+    bank_name           = Column(String(255))
+    bank_branch         = Column(String(255))
 
     __table_args__ = (
         Index("idx_emp_salary_structure_emp", "employee_id"),

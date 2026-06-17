@@ -24,6 +24,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 class TokenData(BaseModel):
     user_id: int
     email: str
+    employee_id: Optional[str] = None
     roles: list[str] = []
     permissions: list[str] = []
 
@@ -37,6 +38,7 @@ def create_access_token(data: TokenData) -> str:
     payload = {
         "sub": str(data.user_id),
         "email": data.email,
+        "employee_id": data.employee_id,
         "roles": data.roles,
         "permissions": data.permissions,
         "exp": expires,
@@ -71,7 +73,8 @@ def decode_access_token(token: str) -> TokenData:
         user_id=int(payload["sub"]),
         email=payload["email"],
         roles=payload.get("roles", []),
-        permissions=payload.get("permissions", [])
+        permissions=payload.get("permissions", []),
+        employee_id=payload.get("employee_id")
     )
 
 

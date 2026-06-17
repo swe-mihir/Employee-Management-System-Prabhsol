@@ -11,6 +11,8 @@ import app.employees.model
 import app.attendance.model
 import app.salary.model
 import app.payroll.model
+import app.salary.model
+import app.payroll.model
 
 config = context.config
 config.attributes["sqlalchemy.url"] = settings.DATABASE_URL

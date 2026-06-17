@@ -19,7 +19,8 @@ def _build_token_response(user: User, roles: list[str], permissions: list[str]) 
         user_id=user.id,
         email=user.email,
         roles=roles,
-        permissions=permissions
+        permissions=permissions,
+        employee_id=str(user.employee_id) if user.employee_id else None
     )
     return TokenResponse(
         access_token=create_access_token(token_data),
@@ -84,7 +85,8 @@ def get_me(db: Session, user_id: int, roles: list[str], permissions: list[str]) 
         user_id=user.id,
         email=user.email,
         roles=roles,
-        permissions=permissions
+        permissions=permissions,
+        employee_id=str(user.employee_id) if user.employee_id else None
     )
 
     return MeResponse(
