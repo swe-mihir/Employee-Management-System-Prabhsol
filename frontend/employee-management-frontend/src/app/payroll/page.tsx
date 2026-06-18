@@ -14,7 +14,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import styles from "./payroll.module.css";
 import { generatePayslip } from "@/lib/generatePayslip";
-
+import { sendPayslipEmails, PayslipEmailPayload } from "@/services/api/payrollEmail";
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 // ── Detail card field config ──────────────────────────────────────────────
@@ -95,6 +95,7 @@ const ALL_COLS: { key: ColKey; label: string }[] = [
 
 const DEFAULT_COLS_CURRENT: ColKey[] = ["sr", "employee_name", "designation", "net_salary", "status"];
 const DEFAULT_COLS_HISTORICAL: ColKey[] = ["sr", "employee_name", "designation", "month", "year", "net_salary", "status"];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -191,6 +192,15 @@ export default function PayrollPage() {
   const [bulkPayLoading, setBulkPayLoading] = useState(false);
 
   const [payslipExporting, setPayslipExporting] = useState(false);
+
+  const [emailSending, setEmailSending] = useState(false);
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [emailPreviewList, setEmailPreviewList] = useState<{
+    id: string; name: string; email: string; hasEmail: boolean; month: number; year: number;
+  }[]>([]);
+  const [emailResult, setEmailResult] = useState<{
+    sent: string[]; failed: { name: string; reason: string }[];
+  } | null>(null);  
 
   // Load active employees for filters/add modal
   useEffect(() => {
@@ -453,7 +463,7 @@ async function handleExportPayslips() {
 
       const doc = generatePayslip(record, emp!);
       const monthStr = String(record.month).padStart(2, "0");
-      doc.save(`payslip_${record.employee_name.replace(/\s+/g, "_")}_${record.year}_${monthStr}.pdf`);
+      doc.save(`Payslip_${record.employee_name.replace(/\s+/g, "_")}_${MONTH_NAMES[record.month - 1]}_${record.year}.pdf`);
     }
   } catch (e: unknown) {
     setError(e instanceof Error ? e.message : "Payslip export failed");
@@ -464,6 +474,71 @@ async function handleExportPayslips() {
     }
   }
 }  
+
+  function handleOpenEmailModal() {
+    const paidIds = [...checkedIds].filter(
+      id => records.find(r => r.id === id)?.status === "paid"
+   );
+    const preview = paidIds.flatMap(id => {
+      const record = records.find(r => r.id === id);
+      if (!record) return [];
+      const emp = activeEmployees.find(e => e.id === record.employee_id);
+      return [{
+        id: record.id,
+        name: record.employee_name,
+        email: emp?.work_email ?? "— no work email —",
+        hasEmail: !!emp?.work_email && EMAIL_RE.test(emp.work_email),        month: record.month,
+        year: record.year,
+      }];
+    });
+    setEmailPreviewList(preview);
+    setEmailResult(null);
+    setEmailModalOpen(true);
+  }
+
+  async function handleSendPayslipEmails() {
+    setEmailSending(true);
+    const skipped: string[] = [];
+    const payloads: PayslipEmailPayload[] = [];
+
+    for (const item of emailPreviewList.filter(i => i.hasEmail)) {
+      const record = records.find(r => r.id === item.id);
+      if (!record) continue;
+      const emp = activeEmployees.find(e => e.id === record.employee_id);
+      if (!emp) { skipped.push(`${item.name}: employee record not found`); continue; }
+
+      try {
+        const doc = generatePayslip(record, emp);
+        const pdfBase64 = doc.output("datauristring").split(",")[1];
+        payloads.push({
+          employee_name: item.name,
+          work_email: item.email,
+         month: item.month,
+          year: item.year,
+          pdf_base64: pdfBase64,
+        });
+     } catch {
+        skipped.push(`${item.name}: failed to generate PDF`);
+      }
+    }
+
+   if (skipped.length) setError(`Skipped:\n${skipped.join("\n")}`);
+
+    if (payloads.length) {
+      try {
+        const result = await sendPayslipEmails(payloads);
+        setEmailResult(result);
+      } catch (e: unknown) {
+       setError(e instanceof Error ? e.message : "Email sending failed");
+        setEmailSending(false);
+        return;
+      }
+    } else {
+     setEmailResult({ sent: [], failed: [] });
+    }
+
+    setEmailSending(false);
+  }  
 
   async function handleAdd() {
     if (!addForm.employee_id) { setAddError("Select an employee."); return; }
@@ -635,9 +710,14 @@ async function handleExportPayslips() {
                   {(() => {
                     const paidCount = records.filter(r => r.status === "paid" && checkedIds.has(r.id)).length;
                     return paidCount > 0 ? (
-                      <button className={styles.btnSecondary} onClick={handleExportPayslips} disabled={payslipExporting}>
-                        {payslipExporting ? "Exporting…" : `Export Payslip (${paidCount})`}
-                      </button>
+                      <>
+                        <button className={styles.btnSecondary} onClick={handleExportPayslips} disabled={payslipExporting}>
+                          {payslipExporting ? "Exporting…" : `Export Payslip (${paidCount})`}
+                        </button>
+                        <button className={styles.btnSecondary} onClick={handleOpenEmailModal} disabled={emailSending}>
+                          {emailSending ? "Sending…" : `Email Payslip (${paidCount})`}
+                        </button>
+                      </>
                     ) : null;
                   })()}
                 </>
@@ -1024,6 +1104,93 @@ async function handleExportPayslips() {
               <button className={styles.btnPrimary} style={{ background: "#1a7c4a" }} onClick={handleBulkMarkPaid} disabled={bulkPayLoading}>
                 {bulkPayLoading ? "Marking…" : `Confirm (${records.filter(r => r.status === "calculated" && checkedIds.has(r.id)).length})`}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Email Payslip Modal ── */}
+      {emailModalOpen && (
+        <div className={styles.modalOverlay} onClick={() => { if (!emailSending) setEmailModalOpen(false); }}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Send Payslip Emails</h2>
+              <button className={styles.modalClose} onClick={() => setEmailModalOpen(false)} disabled={emailSending}>✕</button>
+            </div>
+
+            <div className={styles.modalBody}>
+              {!emailResult ? (
+                <>
+                  <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+                    The payslip PDF will be generated and sent to each employee&apos;s work email.
+                  </p>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+                    {emailPreviewList.map(item => (
+                      <div key={item.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        padding: "8px 10px", borderRadius: 6, fontSize: 13,
+                        background: item.hasEmail ? "var(--bg-subtle, #f8f9fb)" : "var(--danger-bg, #fff5f5)",
+                        border: `1px solid ${item.hasEmail ? "var(--border-light, #e5e7eb)" : "var(--danger-border, #fecaca)"}`,
+                      }}>
+                        <span style={{ fontWeight: 500, color: "var(--text-primary)" }}>{item.name}</span>
+                        <span style={{ color: item.hasEmail ? "var(--text-secondary)" : "var(--danger, #c0392b)", fontSize: 12 }}>
+                          {item.email}&nbsp;·&nbsp;{MONTH_NAMES[item.month - 1]} {item.year}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  {emailPreviewList.some(i => !i.hasEmail) && (
+                    <p style={{ fontSize: 12, color: "var(--danger, #c0392b)", marginTop: 10 }}>
+                      ⚠ Employees highlighted above have no work email and will be skipped.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  {emailResult.sent.length > 0 && (
+                    <div style={{ marginBottom: 12 }}>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "#1a7c4a", marginBottom: 6 }}>
+                        ✓ Sent successfully ({emailResult.sent.length})
+                      </p>
+                      {emailResult.sent.map(name => (
+                        <div key={name} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "2px 0" }}>• {name}</div>
+                      ))}
+                    </div>
+                  )}
+                  {emailResult.failed.length > 0 && (
+                    <div>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger, #c0392b)", marginBottom: 6 }}>
+                        ✗ Failed ({emailResult.failed.length})
+                      </p>
+                      {emailResult.failed.map(f => (
+                        <div key={f.name} style={{ fontSize: 13, color: "var(--text-secondary)", padding: "2px 0" }}>
+                          • {f.name} — {f.reason}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {emailResult.sent.length === 0 && emailResult.failed.length === 0 && (
+                    <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>No emails were sent.</p>
+                  )}
+               </>
+              )}
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setEmailModalOpen(false)} disabled={emailSending}>
+                {emailResult ? "Close" : "Cancel"}
+              </button>
+              {!emailResult && (
+                <button
+                  className={styles.btnPrimary}
+                  onClick={handleSendPayslipEmails}
+                  disabled={emailSending || emailPreviewList.every(i => !i.hasEmail)}
+                >
+                  {emailSending
+                    ? "Sending…"
+                   : `Send (${emailPreviewList.filter(i => i.hasEmail).length})`}
+                </button>
+              )}
             </div>
           </div>
         </div>

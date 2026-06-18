@@ -7,6 +7,15 @@ from app.payroll.schema import PayrollCreate, PayrollUpdate, PayrollResponse, Pa
 from app.payroll import service as payroll_service
 from app.auth.deps import get_current_user, get_audited_session, require_role
 from app.db.deps import get_db
+from app.core.config import settings
+import base64, smtplib, os
+from email.mime.multipart import MIMEMultipart
+from email.mime.base import MIMEBase
+from email.mime.text import MIMEText
+from email import encoders
+from pydantic import BaseModel
+import re
+_EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter(prefix="/payroll", tags=["Payroll"])
 
@@ -95,3 +104,79 @@ def mark_paid(
         return payroll_service.mark_paid(db, record_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+MONTH_NAMES = ["January","February","March","April","May","June",
+               "July","August","September","October","November","December"]
+
+class PayslipEmailItem(BaseModel):
+    employee_name: str
+    work_email: str
+    month: int
+    year: int
+    pdf_base64: str
+
+class SendPayslipsRequest(BaseModel):
+    payslips: List[PayslipEmailItem]
+
+class SendPayslipsResponse(BaseModel):
+    sent: List[str]
+    failed: List[dict]
+
+@router.post("/send-payslips", response_model=SendPayslipsResponse)
+def send_payslips(
+    body: SendPayslipsRequest,
+    _=Depends(require_role("admin", "manager")),
+):
+    smtp_host = settings.SMTP_HOST
+    smtp_port = settings.SMTP_PORT
+    smtp_user = settings.SMTP_USER
+    smtp_pass = settings.SMTP_PASS
+    smtp_from = settings.SMTP_FROM or smtp_user
+
+    if not smtp_host or not smtp_user or not smtp_pass:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email is not configured on the server. Set SMTP_HOST, SMTP_USER, SMTP_PASS."
+        )
+
+    sent, failed = [], []
+
+    for item in body.payslips:
+        if not _EMAIL_RE.match(item.work_email):
+            failed.append({"name": item.employee_name, "reason": "Invalid email address"})
+            continue
+        try:
+            pdf_bytes = base64.b64decode(item.pdf_base64)
+            month_name = MONTH_NAMES[item.month - 1]
+            filename = f"Payslip_{item.employee_name.replace(' ', '_')}_{month_name}_{item.year}.pdf"
+
+            msg = MIMEMultipart()
+            msg["From"] = smtp_from
+            msg["To"] = item.work_email
+            msg["Subject"] = f"Your Payslip for {month_name} {item.year}"
+            msg.attach(MIMEText(
+                f"Dear {item.employee_name},\n\n"
+                f"Please find attached your payslip for {month_name} {item.year}.\n\n"
+                f"This is an auto-generated email. Please do not reply.\n\n"
+                f"Regards,\nPrabh Solutions Pvt. Ltd.",
+                "plain"
+            ))
+
+            part = MIMEBase("application", "octet-stream")
+            part.set_payload(pdf_bytes)
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f'attachment; filename="{filename}"')
+            msg.attach(part)
+
+            with smtplib.SMTP(smtp_host, smtp_port) as server:
+                server.ehlo()
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_from, item.work_email, msg.as_string())
+
+            sent.append(item.employee_name)
+
+        except Exception as e:
+            failed.append({"name": item.employee_name, "reason": str(e)})
+
+    return {"sent": sent, "failed": failed}
