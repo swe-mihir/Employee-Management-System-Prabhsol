@@ -30,3 +30,15 @@ def get_monthly(
     db: Session = Depends(get_db),
 ):
    return attendance_service.get_monthly(db, year, month, employee_id)
+
+from app.auth.deps import get_current_user, get_audited_session
+
+from app.attendance.schema import AttendanceDailyResponse, AttendanceMonthResponse, AttendanceMarkRequest, AttendanceMarkResponse
+
+@router.post("/mark", response_model=AttendanceMarkResponse, status_code=201)
+def mark_attendance(
+    payload: AttendanceMarkRequest,
+    db: Session = Depends(get_audited_session),
+    _: TokenData = Depends(get_current_user),
+):
+    return attendance_service.mark_attendance(db, payload)

@@ -9,7 +9,7 @@ from app.attendance.schema import (
     AttendanceMonthItem,
     AttendanceMonthResponse,
 )
-
+from sqlalchemy import select
 PAID_STATUSES = {"P", "PL", "SL"}
 
 STATUS_MAP = {
@@ -81,3 +81,37 @@ def get_monthly(db: Session, year: int, month: int, employee_id: Optional[str] =
         total=len(emp_map),
         items=list(emp_map.values()),
     )
+
+from app.attendance.schema import AttendanceMarkRequest, AttendanceMarkResponse
+from app.attendance.model import Attendance
+
+def mark_attendance(db: Session, payload: AttendanceMarkRequest) -> AttendanceMarkResponse:
+    saved = 0
+    errors = []
+    for item in payload.records:
+        try:
+            existing = db.execute(
+                select(Attendance).where(
+                    Attendance.employee_id == item.employee_id,
+                    Attendance.date == item.date,
+                )
+            ).scalar_one_or_none()
+            if existing:
+                existing.status = item.status
+                existing.clock_in = item.clock_in
+                existing.clock_out = item.clock_out
+                existing.hours_worked = item.hours_worked
+            else:
+                db.add(Attendance(
+                    employee_id=item.employee_id,
+                    date=item.date,
+                    status=item.status,
+                    clock_in=item.clock_in,
+                    clock_out=item.clock_out,
+                    hours_worked=item.hours_worked,
+                ))
+            saved += 1
+        except Exception as e:
+            errors.append(str(e))
+    db.commit()
+    return AttendanceMarkResponse(saved=saved, errors=errors)

@@ -70,3 +70,26 @@ export async function fetchMonthlyAttendance(year: number, month: number, employ
    });
    return handleResponse<MonthAttendanceResponse>(res);
  }
+
+ export interface AttendanceMarkItem {
+  employee_id: string;
+  date: string;
+  status: string;
+  clock_in?: string;
+  clock_out?: string;
+  hours_worked?: number;
+}
+
+export interface AttendanceMarkResponse {
+  saved: number;
+  errors: string[];
+}
+
+export async function markAttendance(records: AttendanceMarkItem[]): Promise<AttendanceMarkResponse> {
+  const res = await fetch(`${API_BASE}/attendance/mark`, {
+    method: "POST",
+    headers: authHeaders(),
+    body: JSON.stringify({ records }),
+  });
+  return handleResponse<AttendanceMarkResponse>(res);
+}

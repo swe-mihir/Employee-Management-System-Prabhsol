@@ -5,7 +5,8 @@ import styles from "./attendance.module.css";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { fetchDailyAttendance, DailyAttendanceItem } from "@/services/api/attendance";
+import { fetchDailyAttendance, DailyAttendanceItem, markAttendance, AttendanceMarkItem } from "@/services/api/attendance";
+import { fetchEmployees, Employee } from "@/services/api/employees";
 import { getStoredUser } from "@/lib/tokenStorage";
 
 type AttendanceStatus = "P" | "A" | "SL" | "PL" | "WH";
@@ -59,6 +60,8 @@ function getCellValue(r: DailyRecord, key: ColKey, i: number): string {
   return "—";
 }
 
+type MarkEntry = { status: string; clock_in: string; clock_out: string };
+
 export default function DailyView() {
   const today = toDateStr(new Date());
   const [date, setDate] = useState(today);
@@ -72,6 +75,14 @@ export default function DailyView() {
   const exportRef = useRef<HTMLDivElement>(null);
   const filterRef = useRef<HTMLDivElement>(null);
 
+  const [markOpen, setMarkOpen] = useState(false);
+  const [markEmployees, setMarkEmployees] = useState<Employee[]>([]);
+  const [markData, setMarkData] = useState<Record<string, MarkEntry>>({});
+  const [markDate, setMarkDate] = useState(today);
+  const [markSaving, setMarkSaving] = useState(false);
+  const [markError, setMarkError] = useState<string | null>(null);
+  const [markSuccess, setMarkSuccess] = useState<string | null>(null);
+
   const storedUser = getStoredUser();
   const isEmployee = (storedUser?.roles ?? []).includes("employee") &&
     !(storedUser?.roles ?? []).includes("admin") &&
@@ -79,16 +90,16 @@ export default function DailyView() {
   const selfEmployeeId = isEmployee ? storedUser?.employee_id : undefined;
 
   const load = useCallback(async () => {
-     setLoading(true);
-     setError(null);
-     try {
+    setLoading(true);
+    setError(null);
+    try {
       const data = await fetchDailyAttendance(date, selfEmployeeId);
-       setRecords(data.items);
-     } catch (e: unknown) {
-       setError(e instanceof Error ? e.message : "Failed to load attendance");
-     } finally {
-       setLoading(false);
-     }
+      setRecords(data.items);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Failed to load attendance");
+    } finally {
+      setLoading(false);
+    }
   }, [date, selfEmployeeId]);
 
   useEffect(() => { load(); }, [load]);
@@ -105,6 +116,18 @@ export default function DailyView() {
   function toggleCol(key: ColKey) {
     if (key === "sr" || key === "name") return;
     setVisibleCols(c => c.includes(key) ? c.filter(x => x !== key) : [...c, key]);
+  }
+
+  function setEntry(empId: string, field: keyof MarkEntry, value: string) {
+    setMarkData(d => ({
+      ...d,
+      [empId]: {
+        status: d[empId]?.status ?? "",
+        clock_in: d[empId]?.clock_in ?? "",
+        clock_out: d[empId]?.clock_out ?? "",
+        [field]: value,
+      },
+    }));
   }
 
   async function handleExport(format: "excel" | "pdf") {
@@ -148,11 +171,75 @@ export default function DailyView() {
     setExporting(false);
   }
 
+  async function handleOpenMark() {
+    setMarkDate(date);
+    setMarkError(null);
+    setMarkSuccess(null);
+    try {
+      const data = await fetchEmployees({ status: "current", page: 1, page_size: 200 });
+      setMarkEmployees(data.items);
+      const existing: Record<string, MarkEntry> = {};
+      records.forEach(r => {
+        existing[r.employee_id] = {
+          status: r.status ?? "",
+          clock_in: r.clock_in ?? "",
+          clock_out: r.clock_out ?? "",
+        };
+      });
+      setMarkData(existing);
+    } catch {
+      setMarkData({});
+    }
+    setMarkOpen(true);
+  }
+
+  async function handleSaveMark() {
+    setMarkSaving(true);
+    setMarkError(null);
+    setMarkSuccess(null);
+    try {
+      const items: AttendanceMarkItem[] = markEmployees
+        .filter(e => markData[e.id]?.status)
+        .map(e => ({
+          employee_id: e.id,
+          date: markDate,
+          status: markData[e.id].status,
+          clock_in: markData[e.id].clock_in || undefined,
+          clock_out: markData[e.id].clock_out || undefined,
+        }));
+      if (!items.length) { setMarkError("No attendance marked."); setMarkSaving(false); return; }
+      const res = await markAttendance(items);
+      setMarkSuccess(`Saved ${res.saved} record(s).${res.errors.length ? " Some errors: " + res.errors.join(", ") : ""}`);
+      load();
+    } catch (e: unknown) {
+      setMarkError(e instanceof Error ? e.message : "Failed to save");
+    } finally {
+      setMarkSaving(false);
+    }
+  }
+
   const activeCols = ALL_COLS.filter(c => visibleCols.includes(c.key));
+
+  const inputStyle: React.CSSProperties = {
+    height: 30,
+    border: "1px solid var(--border-default)",
+    borderRadius: "var(--radius-sm)",
+    padding: "0 8px",
+    fontSize: 13,
+    fontFamily: "inherit",
+    color: "var(--text-primary)",
+    background: "var(--bg-card)",
+    outline: "none",
+  };
 
   return (
     <>
       <div className={styles.controls}>
+        {!isEmployee && (
+          <button className={styles.btnSecondary} onClick={handleOpenMark}>
+            Mark Attendance
+          </button>
+        )}
         <input
           type="date"
           className={styles.datePicker}
@@ -243,6 +330,83 @@ export default function DailyView() {
           </tbody>
         </table>
       </div>
+
+      {markOpen && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 200, padding: 24 }}>
+          <div style={{ background: "var(--bg-card)", borderRadius: "var(--radius-lg)", width: "100%", maxWidth: 780, maxHeight: "90vh", display: "flex", flexDirection: "column", boxShadow: "0 8px 40px rgba(0,0,0,0.18)" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "20px 24px 16px", borderBottom: "1px solid var(--border-default)" }}>
+              <h2 style={{ fontSize: 17, fontWeight: 700, color: "var(--text-primary)", margin: 0 }}>Mark Attendance</h2>
+              <button style={{ background: "none", border: "none", fontSize: 16, color: "var(--text-muted)", cursor: "pointer", padding: "4px 8px" }} onClick={() => setMarkOpen(false)}>✕</button>
+            </div>
+            <div style={{ padding: "12px 24px", borderBottom: "1px solid var(--border-default)" }}>
+              <label style={{ fontSize: 12.5, fontWeight: 500, color: "var(--text-primary)", display: "block", marginBottom: 4 }}>Date</label>
+              <input type="date" value={markDate} max={today}
+                onChange={e => setMarkDate(e.target.value)}
+                style={{ height: 36, border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", padding: "0 10px", fontSize: 13, fontFamily: "inherit", outline: "none" }}
+              />
+            </div>
+            {markError && <div style={{ margin: "8px 24px 0", padding: "8px 12px", background: "#fff5f5", border: "1px solid #fecaca", borderRadius: "var(--radius-md)", fontSize: 13, color: "#c0392b" }}>{markError}</div>}
+            {markSuccess && <div style={{ margin: "8px 24px 0", padding: "8px 12px", background: "#e6f7ee", border: "1px solid #a7f3d0", borderRadius: "var(--radius-md)", fontSize: 13, color: "#1a7c4a" }}>{markSuccess}</div>}
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 0" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: "var(--bg-base)" }}>
+                    {["Employee", "Status", "In Time", "Out Time"].map(h => (
+                      <th key={h} style={{ padding: "8px 16px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.05em", borderBottom: "1px solid var(--border-default)" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {markEmployees.map(emp => (
+                    <tr key={emp.id} style={{ borderBottom: "1px solid var(--border-default)" }}>
+                      <td style={{ padding: "8px 16px", color: "var(--text-primary)" }}>
+                        {emp.name}
+                        {emp.emp_code ? <span style={{ fontSize: 11, color: "var(--text-muted)", marginLeft: 6 }}>{emp.emp_code}</span> : null}
+                      </td>
+                      <td style={{ padding: "8px 16px" }}>
+                        <select
+                          value={markData[emp.id]?.status ?? ""}
+                          onChange={e => setEntry(emp.id, "status", e.target.value)}
+                          style={{ ...inputStyle, minWidth: 130 }}
+                        >
+                          <option value="">— skip —</option>
+                          <option value="P">Present</option>
+                          <option value="A">Absent</option>
+                          <option value="SL">Sick Leave</option>
+                          <option value="PL">Paid Leave</option>
+                          <option value="WH">Weekly Holiday</option>
+                        </select>
+                      </td>
+                      <td style={{ padding: "8px 16px" }}>
+                        <input
+                          type="time"
+                          value={markData[emp.id]?.clock_in ?? ""}
+                          onChange={e => setEntry(emp.id, "clock_in", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </td>
+                      <td style={{ padding: "8px 16px" }}>
+                        <input
+                          type="time"
+                          value={markData[emp.id]?.clock_out ?? ""}
+                          onChange={e => setEntry(emp.id, "clock_out", e.target.value)}
+                          style={inputStyle}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, padding: "16px 24px", borderTop: "1px solid var(--border-default)" }}>
+              <button style={{ height: 36, padding: "0 14px", background: "var(--bg-card)", border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)", fontSize: 13, cursor: "pointer" }} onClick={() => setMarkOpen(false)}>Cancel</button>
+              <button style={{ height: 36, padding: "0 16px", background: "var(--brand-orange)", color: "#fff", border: "none", borderRadius: "var(--radius-md)", fontSize: 13, fontWeight: 600, cursor: markSaving ? "not-allowed" : "pointer", opacity: markSaving ? 0.55 : 1 }} onClick={handleSaveMark} disabled={markSaving}>
+                {markSaving ? "Saving…" : "Save Attendance"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

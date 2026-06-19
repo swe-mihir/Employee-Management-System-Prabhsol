@@ -38,3 +38,18 @@ class AttendanceMonthResponse(BaseModel):
     days_in_month: int
     total: int
     items: list[AttendanceMonthItem]
+
+class AttendanceMarkItem(BaseModel):
+    employee_id: uuid.UUID
+    date: date
+    status: str
+    clock_in: Optional[time] = None
+    clock_out: Optional[time] = None
+    hours_worked: Optional[float] = None
+
+class AttendanceMarkRequest(BaseModel):
+    records: list[AttendanceMarkItem]
+
+class AttendanceMarkResponse(BaseModel):
+    saved: int
+    errors: list[str]
