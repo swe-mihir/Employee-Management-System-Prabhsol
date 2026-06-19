@@ -10,12 +10,14 @@ import { fetchEmployees, Employee } from "@/services/api/employees";
 import { useRoleGuard } from "@/hooks/useRoleGuard";
 import styles from "./users.module.css";
 
-const ROLES = ["admin", "manager", "employee"] as const;
+const ROLES = ["admin", "manager", "employee",  "hr", "assistant"] as const;
 type Role = typeof ROLES[number];
 
 function roleBadgeClass(role: string) {
   if (role === "admin")    return styles.roleBadgeAdmin;
   if (role === "manager")  return styles.roleBadgeManager;
+  if (role === "hr") return styles.roleBadgeHR;
+  if (role === "assistant") return styles.roleBadgeAssistant;
   return styles.roleBadgeEmployee;
 }
 
@@ -159,7 +161,7 @@ export default function UsersPage() {
           <div className={styles.left}>
             <h1 className={styles.title}>Users</h1>
             <div className={styles.radioGroup}>
-              {(["all", "admin", "manager", "employee"] as const).map(opt => (
+              {(["all", "admin", "manager", "employee", "hr", "assistant"] as const).map(opt => (
                 <label key={opt} className={`${styles.radioLabel} ${roleFilter === opt ? styles.radioActive : ""}`}>
                   <input type="radio" name="roleFilter" value={opt}
                     checked={roleFilter === opt}
@@ -351,6 +353,8 @@ export default function UsersPage() {
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                   <option value="employee">Employee</option>
+                  <option value="hr">HR</option>
+                  <option value="assistant">Assistant</option>
                 </select>
               </div>
             </div>
@@ -402,6 +406,8 @@ export default function UsersPage() {
                   <option value="admin">Admin</option>
                   <option value="manager">Manager</option>
                   <option value="employee">Employee</option>
+                  <option value="hr">HR</option>
+                  <option value="assistant">Assistant</option>
                 </select>
               </div>
             </div>

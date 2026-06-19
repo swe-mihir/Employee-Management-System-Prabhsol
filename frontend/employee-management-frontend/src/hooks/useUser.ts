@@ -30,6 +30,18 @@ export function useIsEmployee(): boolean {
   return u.roles.includes("employee") && !u.roles.includes("admin") && !u.roles.includes("manager");
 }
 
+export function useIsHr(): boolean {
+  const u = useUser();
+  if (!u) return false;
+  return u.roles.includes("hr") ?? false;
+}
+
+export function useIsAssistant(): boolean {
+  const u = useUser();
+  if (!u) return false;
+  return u.roles.includes("assistant") ?? false;
+}
+
 export function useHasRole(...roles: string[]): boolean {
   const u = useUser();
   return roles.some(r => u?.roles?.includes(r)) ?? false;

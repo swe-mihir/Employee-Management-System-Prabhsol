@@ -58,14 +58,15 @@ const DEFAULT_COLS: ColKey[] = [
   "bank",
 ];
 
+
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function fmt(v: number) { return Number(v).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 export default function SalaryPage() {
-  useRoleGuard(["admin", "manager", "employee"], "/attendance");
+  useRoleGuard(["admin", "manager", "employee", "hr", "assistant"], "/attendance");
   const user = useUser();
-  const isEmployee = user?.roles?.includes("employee") && !user.roles.includes("admin") && !user.roles.includes("manager");
+  const isEmployee = (user?.roles?.includes("employee") || user?.roles?.includes("assistant")) && !user.roles.includes("admin") && !user.roles.includes("manager");
 
   const [structures, setStructures] = useState<SalaryStructure[]>([]);
   const [loading, setLoading] = useState(true);
@@ -255,6 +256,7 @@ export default function SalaryPage() {
               gap: 12,
             }}
           >
+              {isEmployee && (
             <div className={styles.filterWrap} ref={colRef}>
               <button
                 className={styles.btnSecondary}
@@ -262,7 +264,52 @@ export default function SalaryPage() {
               >
                 Columns
               </button>
+            
+              {colDropOpen && (
+                <div className={styles.filterDropdown}>
+                  <p className={styles.filterHeading}>
+                    Toggle columns
+                  </p>
 
+                  {ALL_COLS
+                    .filter(c => c.key !== "sr" && c.key != "basic" && c.key != "conveyance" && c.key != "hra" && c.key != "medical")
+                    .map(col => (
+                      <label
+                        key={col.key}
+                        className={styles.filterRow}
+                      >
+                        
+                        <input
+                          type="checkbox"
+                          checked={visibleCols.includes(col.key)}
+                          onChange={() =>
+                            setVisibleCols(cols =>
+                              cols.includes(col.key)
+                                ? cols.filter(
+                                    c => c !== col.key
+                                  )
+                                : [...cols, col.key]
+                            )
+                          }
+                        />
+                        {col.label}
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+              )}
+
+              {!isEmployee && (
+              <div className={styles.filterWrap} ref={colRef}>
+
+              <button
+                className={styles.btnSecondary}
+                onClick={() => setColDropOpen(o => !o)}
+              >
+                Columns
+              </button>
+              
               {colDropOpen && (
                 <div className={styles.filterDropdown}>
                   <p className={styles.filterHeading}>
@@ -295,7 +342,7 @@ export default function SalaryPage() {
                 </div>
               )}
             </div>
-
+            )}
             {!isEmployee && (
              <button
                className={styles.btnPrimary}

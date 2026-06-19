@@ -134,7 +134,7 @@ function statusBadgeClass(s: string) {
 // ── Component ─────────────────────────────────────────────────────────────
 
 export default function PayrollPage() {
-  useRoleGuard(["admin", "manager"], "/attendance");
+  useRoleGuard(["admin", "manager", "hr"], "/attendance");
 
   const now = new Date();
   const [viewMode, setViewMode] = useState<"current" | "historical">("current");

@@ -161,6 +161,8 @@
 .roleBadgeAdmin    { background: var(--brand-blue-light); color: var(--brand-blue); }
 .roleBadgeManager  { background: var(--brand-orange-light); color: var(--brand-orange-hover); }
 .roleBadgeEmployee { background: var(--bg-base); color: var(--text-secondary); border: 1px solid var(--border-default); }
+.roleBadgeHR { background: var(--brand-green-light, #e6f4ea); color: var(--brand-green, #1e7e34); border: 1px solid var(--border-default); }
+.roleBadgeAssistant { background: #f0eaff; color: #6b21a8; border: 1px solid var(--border-default); }
 
 /* Actions */
 .actions { display: flex; gap: 8px; }

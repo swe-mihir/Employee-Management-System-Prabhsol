@@ -6,7 +6,7 @@ import PageTemplate from '@/components/ui/PageTemplate';
 import { useRoleGuard } from '@/hooks/useRoleGuard';
 
 export default function DashboradPage() {
-  useRoleGuard(['admin', 'manager'], '/attendance');
+  useRoleGuard(['admin', 'manager', 'hr'], '/attendance');
   return (
     <AppShell>
       <PageTemplate

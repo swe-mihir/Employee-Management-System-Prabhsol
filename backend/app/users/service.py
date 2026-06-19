@@ -46,7 +46,7 @@ def get_user(db: Session, user_id: int) -> UserResponse:
 
 
 def create_user(db: Session, payload: UserCreate) -> UserResponse:
-    VALID_ROLES = {"admin", "manager", "employee"}
+    VALID_ROLES = {"admin", "manager", "employee", "hr", "assistant"}
     if payload.role not in VALID_ROLES:
         raise ValueError(f"Role must be one of: {', '.join(VALID_ROLES)}")
 

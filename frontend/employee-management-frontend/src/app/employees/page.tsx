@@ -119,7 +119,7 @@ const EMPTY_CREATE: EmployeeCreate = {
 // ── Component ──────────────────────────────────────────────────────────────
 
 export default function EmployeesPage() {
-  useRoleGuard(['admin', 'manager'], '/attendance');
+  useRoleGuard(['admin', 'manager', "hr"], '/attendance');
 
   const [employees, setEmployees]     = useState<Employee[]>([]);
   const [total, setTotal]             = useState(0);

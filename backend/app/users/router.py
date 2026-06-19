@@ -14,7 +14,7 @@ def list_users(
     sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    _=Depends(require_role("admin")),
+    _=Depends(require_role("admin", "hr")),
     db: Session = Depends(get_db),
 ):
     return user_service.list_users(db, page, page_size, sort_by, sort_dir)
@@ -23,7 +23,7 @@ def list_users(
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(
     user_id: int,
-    _=Depends(require_role("admin")),
+    _=Depends(require_role("admin", "hr")),
     db: Session = Depends(get_db),
 ):
     try:
@@ -36,7 +36,7 @@ def get_user(
 def create_user(
     payload: UserCreate,
     db: Session = Depends(get_audited_session),
-    _=Depends(require_role("admin")),
+    _=Depends(require_role("admin", "hr")),
 ):
     try:
         return user_service.create_user(db, payload)
@@ -49,7 +49,7 @@ def update_user(
     user_id: int,
     payload: UserUpdate,
     db: Session = Depends(get_audited_session),
-    _=Depends(require_role("admin")),
+    _=Depends(require_role("admin", "hr")),
 ):
     try:
         return user_service.update_user(db, user_id, payload)
