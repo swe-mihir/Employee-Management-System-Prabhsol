@@ -4,6 +4,7 @@ from app.users.schema import UserCreate, UserUpdate, UserResponse, UserListRespo
 from app.users import service as user_service
 from app.auth.deps import require_role, get_audited_session
 from app.db.deps import get_db
+from app.core.security import TokenData
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -53,5 +54,18 @@ def update_user(
 ):
     try:
         return user_service.update_user(db, user_id, payload)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    
+from app.auth.deps import get_current_user
+
+@router.put("/me/password", response_model=UserResponse)
+def change_my_password(
+    payload: UserUpdate,
+    db: Session = Depends(get_audited_session),
+    current_user: TokenData = Depends(get_current_user),
+):
+    try:
+        return user_service.update_user(db, current_user.user_id, payload)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
