@@ -17,6 +17,8 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 
+import DocumentsModal from "./DocumentsModal";
+
 // ── Column definitions ─────────────────────────────────────────────────────
 
 type ColKey =
@@ -159,6 +161,8 @@ export default function EmployeesPage() {
   const [deactivatePassword, setDeactivatePassword] = useState("");
   const [deactivateError, setDeactivateError] = useState<string | null>(null);
   const [deactivateVerifying, setDeactivateVerifying] = useState(false);
+
+  const [docsEmp, setDocsEmp] = useState<Employee | null>(null);
 
   // ── Fetch ──────────────────────────────────────────────────────────────
 
@@ -558,6 +562,7 @@ export default function EmployeesPage() {
                           )}
                           <button className={styles.actionBtnView} onClick={() => setViewEmp(emp)}>View</button>
                           <button className={styles.actionBtnEdit} onClick={() => openEdit(emp)}>Edit</button>
+                          <button className={styles.actionBtnView} onClick={() => setDocsEmp(emp)}>Docs</button>
                         </div>
                     </td>
                   </tr>
@@ -835,6 +840,14 @@ export default function EmployeesPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {docsEmp && (
+        <DocumentsModal
+          employeeId={docsEmp.id}
+          employeeName={docsEmp.name}
+          onClose={() => setDocsEmp(null)}
+        />
       )}
     </AppShell>
   );

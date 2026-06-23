@@ -19,7 +19,7 @@ from app.attendance.router import router as attendance_router
 from app.users.router import router as users_router
 from app.salary.router import router as salary_structure_router
 from app.payroll.router import router as payroll_router
-
+from app.documents.router import router as documents_router
 
 security = HTTPBearer()
 
@@ -55,6 +55,7 @@ app.include_router(attendance_router)
 app.include_router(users_router)
 app.include_router(payroll_router)
 app.include_router(salary_structure_router)
+app.include_router(documents_router)
 
 def custom_openapi():
     if app.openapi_schema:

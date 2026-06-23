@@ -2,7 +2,7 @@ documentation/*.xlsx
 documentation/*.xlsm
 documentation/*.txt
 backend/*.env
-
+backend/uploads/*
 venv/
 .env
 
