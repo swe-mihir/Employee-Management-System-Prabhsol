@@ -18,6 +18,9 @@ class SalaryStructureCreate(BaseModel):
     bank_ifsc_code: Optional[str] = None
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    transaction_type: Optional[str] = None
+    bene_id: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class SalaryStructureUpdate(BaseModel):
@@ -32,6 +35,9 @@ class SalaryStructureUpdate(BaseModel):
     bank_ifsc_code: Optional[str] = None
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    transaction_type: Optional[str] = None
+    bene_id: Optional[str] = None
+    remarks: Optional[str] = None
 
 
 class SalaryStructureResponse(BaseModel):
@@ -49,6 +55,9 @@ class SalaryStructureResponse(BaseModel):
     bank_ifsc_code: Optional[str] = None
     bank_name: Optional[str] = None
     bank_branch: Optional[str] = None
+    transaction_type: Optional[str] = None
+    bene_id: Optional[str] = None
+    remarks: Optional[str] = None    
 
     model_config = {"from_attributes": True}
 

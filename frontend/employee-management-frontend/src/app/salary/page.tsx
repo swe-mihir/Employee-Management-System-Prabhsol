@@ -14,7 +14,8 @@ import { fetchMyPayroll, PayrollRecord } from "@/services/api/payroll";
 const EMPTY: SalaryStructureCreate = {
   employee_id: "", basic_allowance: 0, hra_allowance: 0,
   conveyance_allowance: 0, medical_allowance: 0, effective_from: "",
-  account_name: "", account_number: "", bank_ifsc_code: "", bank_name: "", bank_branch: "",
+  account_name: "", account_number: "", bank_ifsc_code: "", bank_name: "", bank_branch: "", 
+  transaction_type: "",  bene_id: "", remarks: ""
 };
 
 //chatgpt
@@ -31,7 +32,10 @@ type ColKey =
   | "bank_branch"
   | "bank_ifsc_code"
   | "account_name"
-  | "account_number";
+  | "account_number"
+  | "transaction_type"
+  | "bene_id"
+  | "remarks";
 
 const ALL_COLS: { key: ColKey; label: string }[] = [
   { key: "sr", label: "Sr." },
@@ -47,6 +51,11 @@ const ALL_COLS: { key: ColKey; label: string }[] = [
   { key: "bank_ifsc_code", label: "IFSC Code"},
   { key: "account_name", label: "Account Name" },
   { key: "account_number", label: "Account Number" },
+  { key: "transaction_type", label: "Transaction Type" },
+  { key: "bene_id", label: "Bene ID" },
+  { key: "remarks", label: "Remarks" },
+  
+  
 ];
 
 const DEFAULT_COLS: ColKey[] = [
@@ -234,6 +243,19 @@ export default function SalaryPage() {
       case "account_number":
         return s.account_number
           ? `${s.account_number}`
+          : "—";
+
+      case "transaction_type":
+        return s.transaction_type
+          ? `${s.transaction_type}`
+          : "—";
+      case "bene_id":
+        return s.bene_id
+          ? `${s.bene_id}`
+          : "—";
+      case "remarks":
+        return s.remarks
+          ? `${s.remarks}`
           : "—";
       
       default:
@@ -499,6 +521,43 @@ export default function SalaryPage() {
                     <input type="text" className={styles.fieldInput} value={(addForm[k] as string) ?? ""} onChange={e => setAddForm(f => ({ ...f, [k]: e.target.value }))} />
                   </div>
                 ))}
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Transaction Type</label>
+                  <select
+                    className={styles.fieldSelect}
+                    value={(addForm.transaction_type as string) ?? ""}
+                    onChange={e => setAddForm(f => ({ ...f, transaction_type: e.target.value }))}
+                  >
+                    <option value="">— Select type —</option>
+                    <option value="WIB">Within Bank (WIB)</option>
+                    <option value="NFT">NEFT (NFT)</option>
+                    <option value="RTG">RTGS (RTG)</option>
+                    <option value="IFC">IMPS (IFC)</option>
+                  </select>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Bene Id</label>
+                  <input
+                    type="text"
+                    className={styles.fieldInput}
+                    value={(addForm.bene_id as string) ?? ""}
+                    maxLength={34}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                      setAddForm(f => ({ ...f, bene_id: val }));
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Remarks</label>
+                  <input
+                    type="text"
+                    className={styles.fieldInput}
+                    value={(addForm.remarks as string) ?? ""}
+                    maxLength={30}
+                    onChange={e => setAddForm(f => ({ ...f, remarks: e.target.value }))}
+                  />
+                </div>
               </div>
             </div>
             <div className={styles.modalFooter}>
@@ -539,6 +598,7 @@ export default function SalaryPage() {
                 </div>
               </div>
               <p className={styles.sectionLabel}>Bank Details</p>
+
               <div className={styles.formGrid2}>
                 {(["account_name", "account_number", "bank_name", "bank_ifsc_code", "bank_branch"] as const).map(k => (
                   <div key={k} className={styles.field}>
@@ -546,6 +606,43 @@ export default function SalaryPage() {
                     <input type="text" className={styles.fieldInput} value={(editForm[k] as string) ?? ""} onChange={e => setEditForm(f => ({ ...f, [k]: e.target.value }))} />
                   </div>
                 ))}
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Transaction Type</label>
+                  <select
+                    className={styles.fieldSelect}
+                    value={(editForm.transaction_type as string) ?? ""}
+                    onChange={e => setEditForm(f => ({ ...f, transaction_type: e.target.value }))}
+                  >
+                    <option value="">— Select type —</option>
+                    <option value="WIB">Within Bank (WIB)</option>
+                    <option value="NFT">NEFT (NFT)</option>
+                    <option value="RTG">RTGS (RTG)</option>
+                    <option value="IFC">IMPS (IFC)</option>
+                  </select>
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Bene Id</label>
+                  <input
+                    type="text"
+                    className={styles.fieldInput}
+                    value={(editForm.bene_id as string) ?? ""}
+                    maxLength={34}
+                    onChange={e => {
+                      const val = e.target.value.replace(/[^a-zA-Z0-9]/g, "");
+                      setEditForm(f => ({ ...f, bene_id: val }));
+                    }}
+                  />
+                </div>
+                <div className={styles.field}>
+                  <label className={styles.fieldLabel}>Remarks</label>
+                  <input
+                    type="text"
+                    className={styles.fieldInput}
+                    value={(editForm.remarks as string) ?? ""}
+                    maxLength={30}
+                    onChange={e => setEditForm(f => ({ ...f, remarks: e.target.value }))}
+                  />
+                </div>
               </div>
             </div>
             <div className={styles.modalFooter}>

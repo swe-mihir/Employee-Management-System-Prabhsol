@@ -34,6 +34,9 @@ export interface SalaryStructure {
   bank_ifsc_code: string | null;
   bank_name: string | null;
   bank_branch: string | null;
+  transaction_type: String | null
+  bene_id: String | null
+  remarks: String | null
 }
 
 export interface SalaryStructureListResponse {
@@ -54,6 +57,9 @@ export interface SalaryStructureCreate {
   bank_ifsc_code?: string;
   bank_name?: string;
   bank_branch?: string;
+  transaction_type: String
+  bene_id: String
+  remarks: String
 }
 
 export async function fetchSalaryStructures(): Promise<SalaryStructureListResponse> {

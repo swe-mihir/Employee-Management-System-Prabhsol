@@ -203,10 +203,10 @@ export default function DocumentsModal({ employeeId, employeeName, onClose }: Pr
               </div>
               <div className={styles.previewBody}>
                 <embed
-  src={`${getViewUrl(employeeId, previewDoc.id)}?token=${token}`}
-  type="application/pdf"
-  className={styles.previewFrame}
-/>
+                  src={`${getViewUrl(employeeId, previewDoc.id)}?token=${token}`}
+                  type="application/pdf"
+                  className={styles.previewFrame}
+                />
               </div>
             </div>
           </div>

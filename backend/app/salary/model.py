@@ -18,6 +18,9 @@ class EmployeeSalaryStructure(Base):
     bank_ifsc_code      = Column(String(20))
     bank_name           = Column(String(255))
     bank_branch         = Column(String(255))
+    transaction_type    = Column(String(3))
+    bene_id             = Column(String(34))
+    remarks             = Column(String(30))
 
     __table_args__ = (
         Index("idx_emp_salary_structure_emp", "employee_id"),
