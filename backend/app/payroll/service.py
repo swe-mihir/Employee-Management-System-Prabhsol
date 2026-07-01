@@ -13,6 +13,7 @@ from app.employees.model import Employee
 from app.salary.repository import get_effective_for_month
 from app.attendance.model import Attendance
 
+from app.core.config import settings
 
 def _enrich(db: Session, record: SalaryHistory) -> PayrollResponse:
     emp = db.execute(select(Employee).where(Employee.id == record.employee_id)).scalar_one_or_none()
@@ -227,3 +228,77 @@ def mark_paid(db: Session, record_id: uuid.UUID) -> PayrollResponse:
     db.commit()
     db.refresh(record)
     return _enrich(db, record)
+
+VALID_TXN_TYPES = {"WIB", "NFT", "RTG", "IFC"}
+
+
+def _validate_bank_row(net_salary, struct):
+    errors = []
+    if not struct:
+        return ["No active salary structure for this month"]
+    if struct.transaction_type not in VALID_TXN_TYPES:
+        errors.append("Invalid or missing transaction type")
+    if not struct.bene_id:
+        errors.append("Missing Bene ID")
+    if not struct.remarks or len(struct.remarks) > 30:
+        errors.append("Remarks missing or exceeds 30 characters")
+    if net_salary is None or net_salary <= 0:
+        errors.append("Net salary missing or not positive")
+    elif len(str(int(net_salary))) + 3 > 15:
+        errors.append("Amount exceeds 15 digits")
+    return errors
+
+
+def _fmt_amount(amount: Decimal) -> str:
+    amount = amount.quantize(Decimal("0.01"))
+    return str(int(amount)) if amount == amount.to_integral_value() else str(amount)
+
+
+def bank_export_data(db: Session, month: int, year: int):
+    days_in_month = calendar.monthrange(year, month)[1]
+    ref_date = date(year, month, days_in_month)
+    rows = repository.get_calculated_for_month(db, month, year)
+
+    included, skipped = [], []
+    for record, emp_name in rows:
+        struct = get_effective_for_month(db, record.employee_id, ref_date, ref_date)
+        errors = _validate_bank_row(record.net_salary, struct)
+        if errors:
+            skipped.append({
+                "employee_id": str(record.employee_id),
+                "employee_name": emp_name,
+                "reason": "; ".join(errors),
+            })
+            continue
+        included.append({
+            "employee_id": str(record.employee_id),
+            "employee_name": emp_name,
+            "transaction_type": struct.transaction_type,
+            "amount": _fmt_amount(record.net_salary),
+            "bene_id": struct.bene_id,
+            "remarks": struct.remarks,
+        })
+    return included, skipped
+
+
+def bank_export_file_text(included: list, month: int, year: int) -> str:
+
+    today = date.today()
+    if date(year, month, 1) < date(today.year, today.month, 1):
+        raise ValueError("Bank export is only available for the current or future months")
+
+    days_in_month = calendar.monthrange(year, month)[1]
+    payment_date = date(year, month, days_in_month)
+    total_amount = sum(Decimal(i["amount"]) for i in included)
+    count = len(included)
+    header = (
+        f"FHR|0011|{settings.BANK_DEBIT_ACCOUNT}|INR"
+        f"|{_fmt_amount(total_amount)}|{count}"
+        f"|{payment_date.strftime('%m/%d/%Y')}|{settings.BANK_FILE_REMARKS}^"
+    )
+    lines = [header] + [
+        f"PRB|{i['transaction_type']}|{i['amount']}|INR|{i['bene_id']}|"
+        f"{settings.BANK_DEBIT_ACCOUNT}|0011|{i['remarks']}|N|PRBNBB^"
+        for i in included
+    ]
+    return "\n".join(lines)

@@ -81,3 +81,14 @@ def update(db: Session, obj: SalaryHistory, data: dict) -> SalaryHistory:
         setattr(obj, k, v)
     db.flush()
     return obj
+
+def get_calculated_for_month(db: Session, month: int, year: int):
+    return db.execute(
+        select(SalaryHistory, Employee.name)
+        .join(Employee, Employee.id == SalaryHistory.employee_id)
+        .where(
+            SalaryHistory.month == month,
+            SalaryHistory.year == year,
+            SalaryHistory.status == "calculated",
+        )
+    ).all()

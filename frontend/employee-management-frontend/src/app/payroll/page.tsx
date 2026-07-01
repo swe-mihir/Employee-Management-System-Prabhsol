@@ -17,6 +17,8 @@ import { generatePayslip } from "@/lib/generatePayslip";
 import { sendPayslipEmails, PayslipEmailPayload } from "@/services/api/payrollEmail";
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
+import { fetchBankExportPreview, downloadBankExportFile, BankExportPreview } from "@/services/api/bankExport";
+
 // ── Detail card field config ──────────────────────────────────────────────
 
 type CardSection = { title: string; fields: { key: keyof PayrollRecord; label: string; editable?: boolean }[] };
@@ -135,6 +137,12 @@ function statusBadgeClass(s: string) {
 
 export default function PayrollPage() {
   useRoleGuard(["admin", "manager", "hr"], "/attendance");
+
+  const [bankExportOpen, setBankExportOpen] = useState(false);
+  const [bankPreview, setBankPreview] = useState<BankExportPreview | null>(null);
+  const [bankPreviewLoading, setBankPreviewLoading] = useState(false);
+  const [bankDownloading, setBankDownloading] = useState(false);
+  const [bankError, setBankError] = useState<string | null>(null);
 
   const now = new Date();
   const [viewMode, setViewMode] = useState<"current" | "historical">("current");
@@ -539,7 +547,31 @@ async function handleExportPayslips() {
 
     setEmailSending(false);
   }  
+async function handleOpenBankExport() {
+  setBankPreview(null);
+  setBankError(null);
+  setBankExportOpen(true);
+  setBankPreviewLoading(true);
+  try {
+    const data = await fetchBankExportPreview(month, year);
+    setBankPreview(data);
+  } catch (e: unknown) {
+    setBankError(e instanceof Error ? e.message : "Failed to load preview");
+  } finally {
+    setBankPreviewLoading(false);
+  }
+}
 
+async function handleBankDownload() {
+  setBankDownloading(true);
+  try {
+    await downloadBankExportFile(month, year);
+  } catch (e: unknown) {
+    setBankError(e instanceof Error ? e.message : "Download failed");
+  } finally {
+    setBankDownloading(false);
+  }
+}
   async function handleAdd() {
     if (!addForm.employee_id) { setAddError("Select an employee."); return; }
     setAddSaving(true);
@@ -723,6 +755,11 @@ async function handleExportPayslips() {
                 </>
               );
             })()}
+            {viewMode === "current" && (
+              <button className={styles.btnSecondary} onClick={handleOpenBankExport}>
+                Bank Export
+              </button>
+            )}
             <button className={styles.btnPrimary} onClick={() => { setAddError(null); setSalaryStructureError(null); setAddForm({ employee_id: "", month, year, ot_hours: 0, advance: 0, loan: 0, tds: 0, employee_mlwf: 0, employer_mlwf: 0, incentive: 0 }); setAddOpen(true); }}>
               + Add to Payroll
             </button>
@@ -1191,6 +1228,76 @@ async function handleExportPayslips() {
                    : `Send (${emailPreviewList.filter(i => i.hasEmail).length})`}
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {bankExportOpen && (
+        <div className={styles.modalOverlay} onClick={() => setBankExportOpen(false)}>
+          <div className={styles.modal} onClick={e => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h2 className={styles.modalTitle}>Bank Bulk Payment Export — {MONTH_NAMES[month - 1]} {year}</h2>
+              <button className={styles.modalClose} onClick={() => setBankExportOpen(false)}>✕</button>
+            </div>
+            <div className={styles.modalBody}>
+              {bankError && <div className={styles.errorBanner}>{bankError}</div>}
+              {bankPreviewLoading && <p style={{ fontSize: 14, color: "var(--text-muted)" }}>Loading preview…</p>}
+              {bankPreview && (
+                <>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: "#1a7c4a", marginBottom: 6 }}>
+                    ✓ Ready for export ({bankPreview.included.length})
+                  </p>
+                  {bankPreview.included.length > 0 && (
+                    <div style={{ maxHeight: 200, overflowY: "auto", marginBottom: 14, border: "1px solid var(--border-default)", borderRadius: "var(--radius-md)" }}>
+                      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
+                        <thead>
+                          <tr style={{ background: "var(--bg-base)" }}>
+                            {["Name","Type","Amount","Bene ID","Remarks"].map(h => (
+                              <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: "var(--text-muted)", borderBottom: "1px solid var(--border-default)", fontSize: 11, textTransform: "uppercase" }}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {bankPreview.included.map(row => (
+                            <tr key={row.employee_id} style={{ borderBottom: "1px solid var(--border-default)" }}>
+                              <td style={{ padding: "6px 10px" }}>{row.employee_name}</td>
+                              <td style={{ padding: "6px 10px" }}>{row.transaction_type}</td>
+                              <td style={{ padding: "6px 10px" }}>₹{row.amount}</td>
+                              <td style={{ padding: "6px 10px", fontFamily: "monospace", fontSize: 11 }}>{row.bene_id}</td>
+                              <td style={{ padding: "6px 10px" }}>{row.remarks}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                  {bankPreview.skipped.length > 0 && (
+                    <>
+                      <p style={{ fontSize: 13, fontWeight: 600, color: "var(--danger, #c0392b)", marginBottom: 6 }}>
+                        ✗ Skipped ({bankPreview.skipped.length})
+                      </p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        {bankPreview.skipped.map(row => (
+                          <div key={row.employee_id} style={{ fontSize: 12, color: "var(--text-secondary)", padding: "4px 8px", background: "var(--bg-base)", borderRadius: 4 }}>
+                            <strong>{row.employee_name}</strong> — {row.reason}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setBankExportOpen(false)}>Close</button>
+              <button
+                className={styles.btnPrimary}
+                onClick={handleBankDownload}
+                disabled={bankDownloading || !bankPreview || bankPreview.included.length === 0}
+              >
+                {bankDownloading ? "Downloading…" : `Download .txt (${bankPreview?.included.length ?? 0})`}
+              </button>
             </div>
           </div>
         </div>

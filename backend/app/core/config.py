@@ -19,6 +19,8 @@ class Settings(BaseSettings):
         "image/png",
         "image/webp",
     ]
+    BANK_DEBIT_ACCOUNT: str = ""
+    BANK_FILE_REMARKS: str = "PrabhSal"
 
     class Config:
         env_file = ".env"

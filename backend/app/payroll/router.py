@@ -15,6 +15,9 @@ from email.mime.text import MIMEText
 from email import encoders
 from pydantic import BaseModel
 import re
+
+from fastapi.responses import PlainTextResponse
+
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 router = APIRouter(prefix="/payroll", tags=["Payroll"])
@@ -180,3 +183,35 @@ def send_payslips(
             failed.append({"name": item.employee_name, "reason": str(e)})
 
     return {"sent": sent, "failed": failed}
+
+@router.get("/bank-export/preview")
+def bank_export_preview(
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(...),
+    _=Depends(require_role("admin", "manager")),
+    db: Session = Depends(get_db),
+):
+    included, skipped = payroll_service.bank_export_data(db, month, year)
+    return {"included": included, "skipped": skipped}
+
+
+@router.get("/bank-export")
+def bank_export_download(
+    month: int = Query(..., ge=1, le=12),
+    year: int = Query(...),
+    _=Depends(require_role("admin", "manager")),
+    db: Session = Depends(get_db),
+    ):
+    try:
+        included, skipped = payroll_service.bank_export_data(db, month, year)
+        included, _ = payroll_service.bank_export_data(db, month, year)
+        text = payroll_service.bank_export_file_text(included, month, year)
+        filename = f"bank_bulk_payment_{year}_{str(month).zfill(2)}.txt"
+        return PlainTextResponse(
+            text,
+            media_type="text/plain",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    
