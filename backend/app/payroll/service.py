@@ -6,6 +6,10 @@ from decimal import Decimal
 import calendar
 import uuid
 
+from io import BytesIO
+from openpyxl import Workbook
+from openpyxl.styles import Font, Alignment
+
 from app.payroll import repository
 from app.payroll.model import SalaryHistory, SalaryComponent
 from app.payroll.schema import PayrollCreate, PayrollUpdate, PayrollResponse, PayrollListResponse
@@ -302,3 +306,111 @@ def bank_export_file_text(included: list, month: int, year: int) -> str:
         for i in included
     ]
     return "\n".join(lines)
+
+MONTH_NAMES_FULL = [
+    "January", "February", "March", "April", "May", "June",
+    "July", "August", "September", "October", "November", "December",
+]
+
+# 40 columns, A..AN — matches the muster roll template layout
+MUSTER_ROLL_HEADERS = [
+    "Sr.\nNo.", "Emp Code", "Employee Name", "Designation", "Date of Birth",
+    "Aadhar No.", "PAN No.", "Date of Joining", "Days Present", "Fix Rate",
+    "Basic", "HRA", "Conveyance", "Medical",
+    "ERN Basic", "ERN HRA", "ERN Conveyance", "ERN Medical",
+    "OT Hours", "OT Amt + Incentive", "Gross Salary",
+    "Employee PF", "Employee ESIC", "PT", "Advance", "Loan", "TDS", "Employee MLWF",
+    "Total Deductions", "Net Salary", "",
+    "Employer PF", "Employer Admin", "Employer Total PF", "Emp+Employer PF",
+    "Employer ESIC", "Emp+Employer ESIC", "Employer MLWF", "Emp+Employer MLWF",
+    "Total CTC",
+]
+
+
+def build_muster_roll_workbook(
+    db: Session,
+    month: int,
+    year: int,
+    employee_ids: List[uuid.UUID],
+) -> BytesIO:
+    rows = repository.get_records_for_export(db, month, year, employee_ids)
+    if not rows:
+        raise ValueError(
+            "No calculated or paid payroll records found for the selected "
+            f"employees in {MONTH_NAMES_FULL[month - 1]} {year}."
+        )
+
+    days_in_month = calendar.monthrange(year, month)[1]
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Muster Roll"
+
+    bold = Font(bold=True)
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    # Rows 1-9: static title / company / principal-employer block
+    ws.cell(row=1, column=1, value="MUSTER ROLL").font = Font(bold=True, size=14)
+    ws.cell(row=2, column=1, value=f"Company: {settings.MUSTER_ROLL_COMPANY_NAME}")
+    ws.cell(row=3, column=1, value=f"Address: {settings.MUSTER_ROLL_COMPANY_ADDRESS}")
+    ws.cell(row=4, column=1, value=f"Principal Employer: {settings.MUSTER_ROLL_PRINCIPAL_NAME}")
+    ws.cell(row=5, column=1, value=f"Principal Employer Address: {settings.MUSTER_ROLL_PRINCIPAL_ADDRESS}")
+    ws.cell(row=6, column=1, value=f"Month: {MONTH_NAMES_FULL[month - 1]} {year}")
+    ws.cell(row=7, column=1, value=f"Days in Month: {days_in_month}")
+    ws.cell(row=8, column=1, value="")
+    ws.cell(row=9, column=1, value="")
+
+    for rng in ("A1:AN1", "A2:AN2", "A3:AN3", "A4:AN4", "A5:AN5", "A6:AN6", "A7:AN7"):
+        ws.merge_cells(rng)
+
+    # Row 10: header labels
+    for idx, label in enumerate(MUSTER_ROLL_HEADERS, start=1):
+        cell = ws.cell(row=10, column=idx, value=label)
+        cell.font = bold
+        cell.alignment = header_align
+
+    # Row 11: numeric reference row (kept per template)
+    for col_idx in range(7, 35):
+        ws.cell(row=11, column=col_idx, value=col_idx)
+
+    # Row 12 is left blank as a spacer, per template.
+
+    start_row = 13
+    for sr, (record, emp) in enumerate(rows, start=1):
+        r = start_row + sr - 1
+        struct = get_effective_for_month(
+            db, record.employee_id,
+            date(year, month, 1), date(year, month, days_in_month),
+        )
+        basic = struct.basic_allowance if struct else None
+        hra = struct.hra_allowance if struct else None
+        conv = struct.conveyance_allowance if struct else None
+        med = struct.medical_allowance if struct else None
+        fix_rate = None
+        if struct:
+            fix_rate = sum(v for v in (basic, hra, conv, med) if v is not None)
+
+        ot_plus_incentive = None
+        if record.ot_amount is not None or record.incentive is not None:
+            ot_plus_incentive = (record.ot_amount or Decimal("0")) + (record.incentive or Decimal("0"))
+
+        values = [
+            sr, emp.emp_code, emp.name, emp.designation, emp.date_of_birth,
+            emp.aadhar_no, emp.pan_no, emp.join_date, record.days_present, fix_rate,
+            basic, hra, conv, med,
+            record.ern_basic, record.ern_hra, record.ern_conveyance, record.ern_medical,
+            record.ot_hours, ot_plus_incentive, record.gross_salary,
+            record.emp_pf, record.emp_esic, record.pt, record.advance, record.loan,
+            record.tds, record.employee_mlwf,
+            record.total_deductions, record.net_salary, None,
+            record.employer_pf, record.employer_admin, record.employer_total_pf,
+            record.emp_employer_pf, record.employer_esic, record.emp_employer_esic,
+            record.employer_mlwf, record.emp_employer_mlwf, record.total_ctc,
+        ]
+        for col_idx, val in enumerate(values, start=1):
+            ws.cell(row=r, column=col_idx, value=val)
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+    return buf

@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 import uuid
 from app.core.security import TokenData
-from app.payroll.schema import PayrollCreate, PayrollUpdate, PayrollResponse, PayrollListResponse
 from app.payroll import service as payroll_service
 from app.auth.deps import get_current_user, get_audited_session, require_role
 from app.db.deps import get_db
@@ -16,7 +15,12 @@ from email import encoders
 from pydantic import BaseModel
 import re
 
-from fastapi.responses import PlainTextResponse
+from app.payroll.schema import (
+    PayrollCreate, PayrollUpdate, PayrollResponse, PayrollListResponse,
+    MusterRollExportRequest,
+)
+from fastapi.responses import PlainTextResponse, StreamingResponse
+
 
 _EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -215,3 +219,22 @@ def bank_export_download(
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     
+@router.post("/muster-roll-export")
+def muster_roll_export(
+    payload: MusterRollExportRequest,
+    _=Depends(require_role("admin", "manager")),
+    db: Session = Depends(get_db),
+):
+    try:
+        buf = payroll_service.build_muster_roll_workbook(
+            db, payload.month, payload.year, payload.employee_ids
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+    filename = f"muster_roll_{payload.year}_{str(payload.month).zfill(2)}.xlsx"
+    return StreamingResponse(
+        buf,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

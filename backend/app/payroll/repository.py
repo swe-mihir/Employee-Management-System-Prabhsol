@@ -92,3 +92,22 @@ def get_calculated_for_month(db: Session, month: int, year: int):
             SalaryHistory.status == "calculated",
         )
     ).all()
+
+
+def get_records_for_export(
+    db: Session,
+    month: int,
+    year: int,
+    employee_ids: List[uuid.UUID],
+):
+    return db.execute(
+        select(SalaryHistory, Employee)
+        .join(Employee, Employee.id == SalaryHistory.employee_id)
+        .where(
+            SalaryHistory.month == month,
+            SalaryHistory.year == year,
+            SalaryHistory.employee_id.in_(employee_ids),
+            SalaryHistory.status.in_(("calculated", "paid")),
+        )
+        .order_by(Employee.name.asc())
+    ).all()

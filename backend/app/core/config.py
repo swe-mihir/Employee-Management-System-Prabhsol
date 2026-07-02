@@ -22,6 +22,11 @@ class Settings(BaseSettings):
     BANK_DEBIT_ACCOUNT: str = ""
     BANK_FILE_REMARKS: str = "PrabhSal"
 
+    MUSTER_ROLL_COMPANY_NAME: str = ""
+    MUSTER_ROLL_COMPANY_ADDRESS: str = ""
+    MUSTER_ROLL_PRINCIPAL_NAME: str = ""
+    MUSTER_ROLL_PRINCIPAL_ADDRESS: str = ""
+
     class Config:
         env_file = ".env"
 

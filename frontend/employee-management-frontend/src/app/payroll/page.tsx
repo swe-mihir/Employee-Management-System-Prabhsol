@@ -9,12 +9,16 @@ import {
 } from "@/services/api/payroll";
 import { fetchEmployees, Employee } from "@/services/api/employees";
 import { getSalaryStructure } from "@/services/api/salaryStructure";
+
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import styles from "./payroll.module.css";
+
 import { generatePayslip } from "@/lib/generatePayslip";
 import { sendPayslipEmails, PayslipEmailPayload } from "@/services/api/payrollEmail";
+import { downloadMusterRollExport } from "@/services/api/musterRoll";
+
 const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 import { fetchBankExportPreview, downloadBankExportFile, BankExportPreview } from "@/services/api/bankExport";
@@ -200,6 +204,8 @@ export default function PayrollPage() {
   const [bulkPayLoading, setBulkPayLoading] = useState(false);
 
   const [payslipExporting, setPayslipExporting] = useState(false);
+
+  const [musterRollDownloading, setMusterRollDownloading] = useState(false);
 
   const [emailSending, setEmailSending] = useState(false);
   const [emailModalOpen, setEmailModalOpen] = useState(false);
@@ -483,6 +489,26 @@ async function handleExportPayslips() {
   }
 }  
 
+  async function handleMusterRollExport() {
+    const eligibleIds = [...checkedIds].filter(id => {
+      const r = records.find(rec => rec.id === id);
+      return r && (r.status === "calculated" || r.status === "paid");
+    });
+    if (!eligibleIds.length) return;
+    const employeeIds = eligibleIds
+      .map(id => records.find(r => r.id === id)?.employee_id)
+      .filter((v): v is string => !!v);
+    setMusterRollDownloading(true);
+    try {
+      await downloadMusterRollExport(month, year, employeeIds);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Muster roll export failed");
+    } finally {
+      setMusterRollDownloading(false);
+    }
+  }
+
+
   function handleOpenEmailModal() {
     const paidIds = [...checkedIds].filter(
       id => records.find(r => r.id === id)?.status === "paid"
@@ -750,6 +776,15 @@ async function handleBankDownload() {
                           {emailSending ? "Sending…" : `Email Payslip (${paidCount})`}
                         </button>
                       </>
+                    ) : null;
+                  })()}
+                  {viewMode === "current" && (() => {
+                    const eligibleCount = calculatedCount +
+                      records.filter(r => r.status === "paid" && checkedIds.has(r.id)).length;
+                    return eligibleCount > 0 ? (
+                      <button className={styles.btnSecondary} onClick={handleMusterRollExport} disabled={musterRollDownloading}>
+                        {musterRollDownloading ? "Exporting…" : `Muster Roll (${eligibleCount})`}
+                      </button>
                     ) : null;
                   })()}
                 </>

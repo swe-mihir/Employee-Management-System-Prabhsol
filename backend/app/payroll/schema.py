@@ -74,3 +74,8 @@ class PayrollResponse(BaseModel):
 class PayrollListResponse(BaseModel):
     total: int
     items: list[PayrollResponse]
+
+class MusterRollExportRequest(BaseModel):
+    month: int
+    year: int
+    employee_ids: List[uuid.UUID]
